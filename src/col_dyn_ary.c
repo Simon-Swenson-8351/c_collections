@@ -29,6 +29,7 @@ enum col_result col_dyn_ary_init(struct col_dyn_ary *to_init, struct col_allocat
     to_init->len = 0;
     to_init->cap = initial_cap;
     to_init->growth_factor = growth_factor;
+    to_init->sorted = true;
     return COL_RESULT_SUCCESS;
 }
 
@@ -41,6 +42,7 @@ enum col_result col_dyn_ary_copy(struct col_dyn_ary *dest, struct col_dyn_ary *s
     dest->len = src->len;
     dest->cap = src->cap;
     dest->growth_factor = src->growth_factor;
+    dest->sorted = src->sorted;
     if(src->cap > 0)
     {
         dest->data = malloc(src->elem_metadata.elem_size * src->cap);
@@ -75,6 +77,11 @@ void col_dyn_ary_clear(struct col_dyn_ary *to_clear)
     }
 }
 
+size_t col_dyn_ary_len(struct col_dyn_ary *self)
+{
+    return self->len;
+}
+
 enum col_result col_dyn_ary_insert_at(struct col_dyn_ary *dyn_ary, void *to_insert, size_t index)
 {
     enum col_result result;
@@ -97,6 +104,7 @@ enum col_result col_dyn_ary_insert_at(struct col_dyn_ary *dyn_ary, void *to_inse
         to_insert
     );
     dyn_ary->len++;
+    dyn_ary->sorted = false;
     return COL_RESULT_SUCCESS;
 }
 
@@ -131,41 +139,114 @@ enum col_result col_dyn_ary_rm(struct col_dyn_ary *dyn_ary, size_t idx, void *re
     return COL_RESULT_SUCCESS;
 }
 
-enum col_result col_dyn_ary_cat(struct col_dyn_ary *first, struct col_dyn_ary *second);
-
-void col_dyn_ary_sort(struct col_dyn_ary *to_sort, col_elem_cmp cmp_fn);
-
-static void move_elem(void *dest, void *src, size_t elem_size, col_elem_move move_fn)
+enum col_result col_dyn_ary_lin_search(struct col_dyn_ary *dyn_ary, void *elem, size_t *idx_if_found)
 {
-    if(move_fn)
+    if(!dyn_ary->elem_metadata.eq_fn) return COL_RESULT_EQ_FN_MISSING;
+    for(size_t i = 0; i < dyn_ary->len; i++)
     {
-        move_fn(dest, src);
+        if(dyn_ary->elem_metadata.eq_fn(&dyn_ary->elem_metadata, elem, dyn_ary->data + dyn_ary->elem_metadata.elem_size * i))
+        {
+            *idx_if_found = i;
+            return COL_RESULT_SUCCESS;
+        }
     }
-    else
-    {
-        memcpy(dest, src, elem_size);
-    }
+    *idx_if_found = SIZE_MAX;
+    return COL_RESULT_ELEM_NOT_FOUND;
 }
 
-static bool copy_elem(void *dest, void *src, size_t elem_size, col_elem_copy copy_fn)
+enum col_result col_dyn_ary_bin_search(struct col_dyn_ary *dyn_ary, void *elem, size_t *idx_if_found)
 {
-    if(copy_fn)
+    if(!dyn_ary->elem_metadata.cmp_fn) return COL_RESULT_CMP_FN_MISSING;
+    if(!dyn_ary->sorted) return COL_RESULT_OP_REQUIRES_SORTING;
+    size_t left = 0;
+    size_t right = dyn_ary->len;
+    while(left < right)
     {
-        return copy_fn(dest, src);
+        size_t mid = (right - left) / 2;
+        int cmp_res = dyn_ary->elem_metadata.cmp_fn(
+            &dyn_ary->elem_metadata,
+            elem,
+            dyn_ary->data + dyn_ary->elem_metadata.elem_size * mid
+        );
+        if(cmp_res < 0)
+        {
+            right = mid;
+        }
+        else if(cmp_res == 0)
+        {
+            *idx_if_found = mid;
+            return COL_RESULT_SUCCESS;
+        }
+        else
+        {
+            left = mid + 1;
+        }
     }
-    else
-    {
-        memcpy(dest, src, elem_size);
-        return true;
-    }
+    *idx_if_found = SIZE_MAX;
+    return COL_RESULT_ELEM_NOT_FOUND;
 }
 
-static void clear_elem(void *to_clear, col_elem_clear clear_fn)
+enum col_result col_dyn_ary_trim(struct col_dyn_ary *dyn_ary)
 {
-    if(clear_fn)
+    uint8_t *new_buf = dyn_ary->allocator.malloc(
+        &dyn_ary->allocator,
+        dyn_ary->len * dyn_ary->elem_metadata.elem_size
+    );
+    if(!new_buf) return COL_RESULT_ALLOC_FAILED;
+    for(size_t i = 0; i < dyn_ary->len; i++)
     {
-        clear_fn(to_clear);
+        dyn_ary->elem_metadata.mv_fn(
+            &dyn_ary->elem_metadata,
+            new_buf + dyn_ary->elem_metadata.elem_size * i,
+            dyn_ary->data + dyn_ary->elem_metadata.elem_size * i
+        );
     }
+    dyn_ary->allocator.free(&dyn_ary->allocator, dyn_ary->data);
+    dyn_ary->data = new_buf;
+    dyn_ary->cap = dyn_ary->len;
+    return COL_RESULT_SUCCESS;
+}
+
+enum col_result col_dyn_ary_cat(struct col_dyn_ary *first, struct col_dyn_ary *second)
+{
+    uint8_t *new_buf = first->allocator.malloc(
+        &first->allocator,
+        first->elem_metadata.elem_size * (first->cap + second->cap)
+    );
+    if(!new_buf) return COL_RESULT_ALLOC_FAILED;
+    size_t i = 0;
+    for(; i < first->len; i++)
+    {
+        first->elem_metadata.mv_fn(
+            &first->elem_metadata,
+            new_buf + first->elem_metadata.elem_size * i,
+            first->data + first->elem_metadata.elem_size * i
+        );
+    }
+    for(; i - first->len < second->len; i++)
+    {
+        first->elem_metadata.mv_fn(
+            &first->elem_metadata,
+            new_buf + first->elem_metadata.elem_size * i,
+            second->data + first->elem_metadata.elem_size * (i - first->len)
+        );
+    }
+    // since we moved the elements out, no need to call the clear function on each element.
+    second->allocator.free(&second->allocator, second->data);
+    first->allocator.free(&first->allocator, first->data);
+    first->data = new_buf;
+    first->len += second->len;
+    first->cap += second->cap;
+    first->sorted = false;
+    return COL_RESULT_SUCCESS;
+}
+
+enum col_result col_dyn_ary_sort(struct col_dyn_ary *to_sort)
+{
+    if(!to_sort->elem_metadata.cmp_fn) return COL_RESULT_CMP_FN_MISSING;
+    qsort(to_sort->data, to_sort->len, to_sort->elem_metadata.elem_size, )
+
+    to_sort->sorted = true;
 }
 
 static enum col_result expand(struct col_dyn_ary *dyn_ary)

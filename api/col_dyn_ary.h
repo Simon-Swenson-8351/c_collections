@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "col_allocator.h"
@@ -15,6 +16,7 @@ struct col_dyn_ary
     size_t len;
     size_t cap;
     float growth_factor;
+    bool sorted;
 };
 
 extern float const COL_DYN_ARY_DEFAULT_GROWTH_FACTOR;
@@ -72,15 +74,17 @@ col_dyn_ary_rm(
     void *removed_elem // must be uninitialized or cleared
 );
 // searching
-int
+enum col_result
 col_dyn_ary_lin_search(
     struct col_dyn_ary *dyn_ary,
-    void *elem
+    void *elem,
+    size_t *idx_if_found
 );
-int
+enum col_result
 col_dyn_ary_bin_search(
     struct col_dyn_ary *dyn_ary,
-    void *elem
+    void *elem,
+    size_t *idx_if_found
 );
 
 
@@ -90,13 +94,14 @@ enum col_result
 col_dyn_ary_trim(
     struct col_dyn_ary *dyn_ary
 );
+// second will be cleared
 enum col_result
 col_dyn_ary_cat(
     struct col_dyn_ary *first,
     struct col_dyn_ary *second
 );
 
-void
+enum col_result
 col_dyn_ary_sort(
     struct col_dyn_ary *to_sort
 );
