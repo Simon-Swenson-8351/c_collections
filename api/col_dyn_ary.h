@@ -4,31 +4,29 @@
 #include <stddef.h>
 
 #include "col_allocator.h"
-#include "col_elem.h"
+#include "col_elem_priv.h"
 #include "col_iter.h"
 #include "col_result.h"
+#include "col_sort.h"
 
 struct col_dyn_ary
 {
-    struct col_allocator allocator;
-    struct col_elem_metadata elem_metadata;
+    struct col_allocator *allocator;
+    struct col_elem_metadata *elem_metadata;
     uint8_t *data;
     size_t len;
     size_t cap;
     float growth_factor;
-    bool sorted;
 };
 
-extern float const COL_DYN_ARY_DEFAULT_GROWTH_FACTOR;
-
-// init, move, copy, clear
+// init, copy, clear
 enum col_result
 col_dyn_ary_init(
     struct col_dyn_ary *to_init,
-    struct col_allocator *allocator,
+    struct col_allocator *allocator, // optional
     struct col_elem_metadata *elem_metadata,
     size_t initial_cap,
-    float growth_factor
+    float growth_factor // must be > 1.0, a reasonable value is 2.0
 );
 enum col_result
 col_dyn_ary_copy(
@@ -73,6 +71,11 @@ col_dyn_ary_rm(
     size_t idx,
     void *removed_elem // must be uninitialized or cleared
 );
+enum col_result
+col_dyn_ary_pop_back(
+    struct col_dyn_ary *dyn_ary,
+    void *removed_elem // must be uninitialized or cleared
+);
 // searching
 enum col_result
 col_dyn_ary_lin_search(
@@ -103,5 +106,6 @@ col_dyn_ary_cat(
 
 enum col_result
 col_dyn_ary_sort(
-    struct col_dyn_ary *to_sort
+    struct col_dyn_ary *to_sort,
+    col_sort_fn sort_fn
 );

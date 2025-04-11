@@ -2,27 +2,14 @@
 
 #include <stdlib.h>
 
-static void *std_malloc(struct col_allocator *priv, size_t size);
-static void std_free(struct col_allocator *priv, void *to_free);
-
-struct col_allocator col_allocator_std = 
+void *col_allocator_malloc(struct col_allocator *self, size_t size)
 {
-    .malloc = std_malloc,
-    .free = std_free,
-    .priv   = NULL
-};
-
-struct col_allocator *col_allocator_get_std(void)
-{
-    return &col_allocator_std;
+    if(!self) return malloc(size);
+    return self->malloc(self, size);
 }
 
-static void *std_malloc(struct col_allocator *priv, size_t size)
+void col_allocator_free(struct col_allocator *self, void *to_free)
 {
-    return malloc(size);
-}
-
-static void std_free(struct col_allocator *priv, void *to_free)
-{
-    free(to_free);
+    if(!self) free(to_free);
+    else if(self->free) self->free(self, to_free);
 }
