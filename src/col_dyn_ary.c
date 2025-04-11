@@ -9,6 +9,7 @@
 float const COL_DYN_ARY_DEFAULT_GROWTH_FACTOR = 2.0;
 
 static enum col_result expand(struct col_dyn_ary *dyn_ary);
+static int qsort_compar(void const *a, void const *b, void *state);
 
 enum col_result col_dyn_ary_init(struct col_dyn_ary *to_init, struct col_allocator *allocator, struct col_elem_metadata *elem_metadata, size_t initial_cap, float growth_factor)
 {
@@ -244,8 +245,13 @@ enum col_result col_dyn_ary_cat(struct col_dyn_ary *first, struct col_dyn_ary *s
 enum col_result col_dyn_ary_sort(struct col_dyn_ary *to_sort)
 {
     if(!to_sort->elem_metadata.cmp_fn) return COL_RESULT_CMP_FN_MISSING;
-    qsort(to_sort->data, to_sort->len, to_sort->elem_metadata.elem_size, )
-
+    qsort_r(
+        to_sort->data,
+        to_sort->len,
+        to_sort->elem_metadata.elem_size,
+        qsort_compar,
+        &to_sort->elem_metadata
+    );
     to_sort->sorted = true;
 }
 
@@ -267,4 +273,13 @@ static enum col_result expand(struct col_dyn_ary *dyn_ary)
     dyn_ary->data = new_buf;
     dyn_ary->cap = new_cap;
     return COL_RESULT_SUCCESS;
+}
+
+static int qsort_compar(void const *a, void const *b, void *state)
+{
+    return ((struct col_elem_metadata *)(state))->cmp_fn(
+        (struct col_elem_metadata *)(state),
+        a,
+        b
+    );
 }
