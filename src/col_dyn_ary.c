@@ -202,9 +202,9 @@ enum col_result col_dyn_ary_cat(struct col_dyn_ary *first, struct col_dyn_ary *s
     return COL_RESULT_SUCCESS;
 }
 
-enum col_result col_dyn_ary_sort(struct col_dyn_ary *to_sort, col_sort_fn sort_fn)
+enum col_result col_dyn_ary_sort_cmp(struct col_dyn_ary *to_sort, col_sort_cmp_fn sort_fn)
 {
-    sort_fn(to_sort->allocator, to_sort->elem_metadata, to_sort->data, to_sort->len);
+    return sort_fn(to_sort->allocator, to_sort->elem_metadata, to_sort->data, to_sort->len);
 }
 
 static enum col_result expand(struct col_dyn_ary *dyn_ary)

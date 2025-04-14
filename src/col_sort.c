@@ -1,6 +1,8 @@
 #include "col_sort_priv.h"
 
 #include <inttypes.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "col_allocator_priv.h"
 #include "col_elem_priv.h"
@@ -16,6 +18,12 @@ enum col_result col_sort_quick(struct col_allocator *allocator, struct col_elem_
     quick_recursive(allocator, md, array_base, count, swap_buf);
     col_allocator_free(allocator, swap_buf);
     return COL_RESULT_SUCCESS;
+}
+
+enum col_result col_sort_cmp_std_qsort(struct col_allocator *allocator, struct col_elem_metadata *md, void *array_base, size_t count)
+{
+    if(!md->cmp_fn) return COL_RESULT_CMP_FN_MISSING;
+    qsort(array_base, count, md->elem_size, md->cmp_fn);
 }
 
 static void swap(void *a, void *b, void *swap_buf, size_t elem_size)

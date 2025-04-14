@@ -1,6 +1,7 @@
 #pragma once
 
 #include <inttypes.h>
+#include <stddef.h>
 
 enum col_result
 {
@@ -16,5 +17,4 @@ enum col_result
 
     COL_RESULT__LEN
 };
-
-char const *col_result_to_string(enum col_result result);
+extern char const * const RESULT_STRS[];

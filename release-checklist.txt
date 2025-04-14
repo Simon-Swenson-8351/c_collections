@@ -1,0 +1,4 @@
+-   Verify #pragma once in headers
+-   Remove unneeded includes
+-   Ensure private headers are not leaked to API
+-   Verify new code via tests

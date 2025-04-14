@@ -4,8 +4,7 @@
 #include <stddef.h>
 
 #include "col_allocator.h"
-#include "col_elem_priv.h"
-#include "col_iter.h"
+#include "col_elem.h"
 #include "col_result.h"
 #include "col_sort.h"
 
@@ -105,7 +104,7 @@ col_dyn_ary_cat(
 );
 
 enum col_result
-col_dyn_ary_sort(
+col_dyn_ary_sort_cmp(
     struct col_dyn_ary *to_sort,
-    col_sort_fn sort_fn
+    col_sort_cmp_fn sort_fn
 );

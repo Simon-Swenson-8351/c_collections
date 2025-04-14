@@ -4,12 +4,14 @@
 
 bool
 col_elem_cp(
+    struct col_allocator *allocator,
     struct col_elem_metadata *md,
     void *dest,
     void *src
 );
 bool
 col_elem_cp_many(
+    struct col_allocator *allocator,
     struct col_elem_metadata *md,
     void *dest,
     void *src,
@@ -17,11 +19,13 @@ col_elem_cp_many(
 );
 void
 col_elem_clr(
+    struct col_allocator *allocator,
     struct col_elem_metadata *md,
     void *to_clear
 );
 void
 col_elem_clr_many(
+    struct col_allocator *allocator,
     struct col_elem_metadata *md,
     void *to_clear,
     size_t count
