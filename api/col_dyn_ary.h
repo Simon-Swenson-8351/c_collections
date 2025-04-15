@@ -8,30 +8,57 @@
 #include "col_result.h"
 #include "col_sort.h"
 
+/**
+ * A dynamic array structure
+ */
 struct col_dyn_ary
 {
-    struct col_allocator *allocator;
-    struct col_elem_metadata *elem_metadata;
-    uint8_t *data;
-    size_t len;
-    size_t cap;
-    float growth_factor;
+    struct col_allocator *allocator; ///< optional
+    struct col_elem_metadata *elem_metadata; ///< required
+    uint8_t *data; ///< data buffer
+    size_t len; ///< number of elements in the array
+    size_t cap; ///< capacity of elements of the buffer
+    float growth_factor; ///< how large to grow the array when it is full
 };
 
 // init, copy, clear
+/**
+ * Initializes a dynamic array
+ * 
+ * @param to_init required, must be uninitialized or cleared
+ * @param allocator optional
+ * @param elem_metadata required
+ * @param initial_cap
+ * @param growth_factor must be > 1.0, a reasonable value is 2.0
+ * @return any error encountered
+ */
 enum col_result
 col_dyn_ary_init(
     struct col_dyn_ary *to_init,
-    struct col_allocator *allocator, // optional
+    struct col_allocator *allocator,
     struct col_elem_metadata *elem_metadata,
     size_t initial_cap,
-    float growth_factor // must be > 1.0, a reasonable value is 2.0
+    float growth_factor
 );
+
+/**
+ * Copies a dynamic array from src to dest
+ * 
+ * @param dest required, must be uninitialized or cleared
+ * @param src required
+ * @return any error encountered
+ */
 enum col_result
 col_dyn_ary_copy(
-    struct col_dyn_ary *dest, // must be uninitialized or cleared
+    struct col_dyn_ary *dest,
     struct col_dyn_ary *src
 );
+
+/**
+ * Clears a dynamic array, clearing each element and freeing the dynamic array's buffer
+ * 
+ * @param to_clear required, must be initialized
+ */
 void
 col_dyn_ary_clear(
     struct col_dyn_ary *to_clear
