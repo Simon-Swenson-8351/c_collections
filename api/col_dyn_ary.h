@@ -123,6 +123,7 @@ enum col_result
 col_dyn_ary_trim(
     struct col_dyn_ary *dyn_ary
 );
+// first will contain all elements
 // second will be cleared
 enum col_result
 col_dyn_ary_cat(

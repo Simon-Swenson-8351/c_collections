@@ -23,7 +23,7 @@ TEMPLATE_dyn_ary_typename ## _init(
     to_init->allocator = allocator;
     if(initial_cap > 0)
     {
-        to_init->data = col_allocator_malloc(allocator, elem_metadata->elem_size * initial_cap);
+        to_init->data = TEMPLATE_allocator_malloc(allocator, sizeof(TEMPLATE_datatype) * initial_cap);
         if(!to_init->data) return COL_RESULT_ALLOC_FAILED;
     }
     else
@@ -155,16 +155,25 @@ TEMPLATE_dyn_ary_typename ## _rm(
     return COL_RESULT_SUCCESS;
 }
 
-enum col_result col_dyn_ary_pop_back(struct col_dyn_ary *dyn_ary, void *removed_elem)
+enum col_result
+TEMPLATE_dyn_ary_typename ## _pop_back(
+    TEMPLATE_dyn_ary_typename *dyn_ary,
+    TEMPLATE_datatype *removed_elem
+)
 {
-    return col_dyn_ary_rm(dyn_ary, dyn_ary->len - 1, removed_elem);
+    return TEMPLATE_dyn_ary_typename ## _rm(dyn_ary, dyn_ary->len - 1, removed_elem);
 }
 
-enum col_result col_dyn_ary_lin_search(struct col_dyn_ary *dyn_ary, void *elem, size_t *idx_if_found)
+enum col_result
+TEMPLATE_dyn_ary_typename ## _lin_search(
+    TEMPLATE_dyn_ary_typename *dyn_ary,
+    TEMPLATE_datatype *elem,
+    size_t *idx_if_found
+)
 {
     for(size_t i = 0; i < dyn_ary->len; i++)
     {
-        if(col_elem_eq(dyn_ary->elem_metadata, elem, dyn_ary->data + dyn_ary->elem_metadata->elem_size * i))
+        if(TEMPLATE_datatype_eq(dyn_ary->elem_metadata, elem, dyn_ary->data + i))
         {
             *idx_if_found = i;
             return COL_RESULT_SUCCESS;
@@ -174,17 +183,22 @@ enum col_result col_dyn_ary_lin_search(struct col_dyn_ary *dyn_ary, void *elem, 
     return COL_RESULT_ELEM_NOT_FOUND;
 }
 
-enum col_result col_dyn_ary_bin_search(struct col_dyn_ary *dyn_ary, void *elem, size_t *idx_if_found)
+enum col_result
+TEMPLATE_dyn_ary_typename ## _bin_search(
+    TEMPLATE_dyn_ary_typename *dyn_ary,
+    TEMPLATE_datatype *elem,
+    size_t *idx_if_found
+)
 {
     size_t left = 0;
     size_t right = dyn_ary->len;
     while(left < right)
     {
         size_t mid = (right - left) / 2;
-        int cmp_res = col_elem_cmp(
+        int cmp_res = TEMPLATE_datatype_cmp(
             dyn_ary->elem_metadata,
             elem,
-            dyn_ary->data + dyn_ary->elem_metadata->elem_size * mid
+            dyn_ary->data + mid
         );
         if(cmp_res < 0)
         {
@@ -204,39 +218,50 @@ enum col_result col_dyn_ary_bin_search(struct col_dyn_ary *dyn_ary, void *elem, 
     return COL_RESULT_ELEM_NOT_FOUND;
 }
 
-enum col_result col_dyn_ary_trim(struct col_dyn_ary *dyn_ary)
+enum col_result
+TEMPLATE_dyn_ary_typename ## _trim(
+    TEMPLATE_dyn_ary_typename *dyn_ary
+)
 {
-    uint8_t *new_buf = col_allocator_malloc(
+    uint8_t *new_buf = TEMPLATE_allocator_malloc(
         dyn_ary->allocator,
-        dyn_ary->len * dyn_ary->elem_metadata->elem_size
+        dyn_ary->len * sizeof(TEMPLATE_datatype)
     );
     if(!new_buf) return COL_RESULT_ALLOC_FAILED;
-    memcpy(new_buf, dyn_ary->data, dyn_ary->len * dyn_ary->elem_metadata->elem_size);
-    col_allocator_free(dyn_ary->allocator, dyn_ary->data);
+    TEMPLATE_datatype_mv_many(new_buf, dyn_ary->data, dyn_ary->len);
+    TEMPLATE_allocator_free(dyn_ary->allocator, dyn_ary->data);
     dyn_ary->data = new_buf;
     dyn_ary->cap = dyn_ary->len;
     return COL_RESULT_SUCCESS;
 }
 
-enum col_result col_dyn_ary_cat(struct col_dyn_ary *first, struct col_dyn_ary *second)
+enum col_result
+TEMPLATE_dyn_ary_typename ## _cat(
+    TEMPLATE_dyn_ary_typename *first,
+    TEMPLATE_dyn_ary_typename *second
+)
 {
     if(first->cap < first->len + second->len)
     {
         // grow if needed
-        uint8_t *new_buf = col_allocator_malloc(first->allocator, first->elem_metadata->elem_size * (first->cap + second->cap));
+        uint8_t *new_buf = TEMPLATE_allocator_malloc(first->allocator, sizeof(TEMPLATE_datatype) * (first->cap + second->cap));
         if(!new_buf) return COL_RESULT_ALLOC_FAILED;
-        memcpy(new_buf, first->data, first->elem_metadata->elem_size * first->len);
-        col_allocator_free(first->allocator, first->data);
+        TEMPLATE_datatype_mv_many(new_buf, first->data, first->len);
+        TEMPLATE_allocator_free(first->allocator, first->data);
         first->data = new_buf;
     }
-    memcpy(first->data + first->len * first->elem_metadata->elem_size, second->data, second->len * second->elem_metadata->elem_size);
-    col_allocator_free(second->allocator, second->data);
+    TEMPLATE_datatype_mv_many(first->data + first->len, second->data, second->len);
+    TEMPLATE_allocator_free(second->allocator, second->data);
     first->len += second->len;
     first->cap += second->cap;
     return COL_RESULT_SUCCESS;
 }
 
-enum col_result col_dyn_ary_sort_cmp(struct col_dyn_ary *to_sort, col_sort_cmp_fn sort_fn)
+enum col_result
+TEMPLATE_dyn_ary_typename ## _sort_cmp(
+    TEMPLATE_dyn_ary_typename *to_sort,
+    col_sort_cmp_fn sort_fn
+)
 {
     return sort_fn(to_sort->allocator, to_sort->elem_metadata, to_sort->data, to_sort->len);
 }
@@ -245,10 +270,10 @@ static enum col_result expand(TEMPLATE_dyn_ary_typename *dyn_ary)
 {
     size_t new_cap = (size_t)((float)(dyn_ary->cap) * dyn_ary->growth_factor);
     if(new_cap == dyn_ary->cap) new_cap++;
-    uint8_t *new_buf = col_allocator_malloc(dyn_ary->allocator, dyn_ary->elem_metadata->elem_size * new_cap);
+    uint8_t *new_buf = TEMPLATE_allocator_malloc(dyn_ary->allocator, sizeof(TEMPLATE_datatype) * new_cap);
     if(!new_buf) return COL_RESULT_ALLOC_FAILED;
-    memcpy(new_buf, dyn_ary->data, dyn_ary->len * dyn_ary->elem_metadata->elem_size);
-    col_allocator_free(dyn_ary->allocator, dyn_ary->data);
+    TEMPLATE_datatype_mv_many(new_buf, dyn_ary->data, dyn_ary->len);
+    TEMPLATE_allocator_free(dyn_ary->allocator, dyn_ary->data);
     dyn_ary->data = new_buf;
     dyn_ary->cap = new_cap;
     return COL_RESULT_SUCCESS;
