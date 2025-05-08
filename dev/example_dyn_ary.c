@@ -1,4 +1,4 @@
-#include "TEMPLATE_dyn_ary.h"
+#include "example_dyn_ary.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -7,12 +7,12 @@
 #include "col_elem_priv.h"
 #include "col_result.h"
 
-static enum col_result expand(TEMPLATE_dyn_ary_typename *dyn_ary);
+static enum col_result expand(MACRO_ARG_dyn_ary_typename *dyn_ary);
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _init(
-    TEMPLATE_dyn_ary_typename *to_init,
-    TEMPLATE_allocator *allocator,
+MACRO_ARG_dyn_ary_typename_init(
+    MACRO_ARG_dyn_ary_typename *to_init,
+    struct col_allocator *allocator,
     size_t initial_cap,
     float growth_factor
 )
@@ -23,7 +23,7 @@ TEMPLATE_dyn_ary_typename ## _init(
     to_init->allocator = allocator;
     if(initial_cap > 0)
     {
-        to_init->data = TEMPLATE_allocator_malloc(allocator, sizeof(TEMPLATE_datatype) * initial_cap);
+        to_init->data = allocator->malloc(allocator, sizeof(MACRO_ARG_datatype) * initial_cap);
         if(!to_init->data) return COL_RESULT_ALLOC_FAILED;
     }
     else
@@ -37,9 +37,9 @@ TEMPLATE_dyn_ary_typename ## _init(
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _copy(
-    TEMPLATE_dyn_ary_typename *dest,
-    TEMPLATE_dyn_ary_typename *src
+MACRO_ARG_dyn_ary_typename_copy(
+    MACRO_ARG_dyn_ary_typename *dest,
+    MACRO_ARG_dyn_ary_typename *src
 )
 {
     if(!dest) return COL_RESULT_BAD_ARG;
@@ -50,19 +50,19 @@ TEMPLATE_dyn_ary_typename ## _copy(
     dest->growth_factor = src->growth_factor;
     if(src->cap > 0)
     {
-        dest->data = TEMPLATE_allocator_malloc(src->allocator, sizeof(TEMPLATE_datatype) * src->cap);
+        dest->data = src->allocator->malloc(src->allocator, sizeof(MACRO_ARG_datatype) * src->cap);
         if(!dest->data) return COL_RESULT_ALLOC_FAILED;
     }
     else
     {
         dest->data = NULL;
     }
-    return TEMPLATE_datatype_cp_many(src->allocator, dest->data, src->data, src->len);
+    return MACRO_ARG_datatype_cp_many(dest->data, src->data, src->len);
 }
 
 void
-TEMPLATE_dyn_ary_typename ## _clear(
-    TEMPLATE_dyn_ary_typename *to_clear
+MACRO_ARG_dyn_ary_typename_clear(
+    MACRO_ARG_dyn_ary_typename *to_clear
 )
 {
     TEMPLATE_datatype_clr_many(to_clear->data, to_clear->len);
@@ -70,16 +70,16 @@ TEMPLATE_dyn_ary_typename ## _clear(
 }
 
 size_t
-TEMPLATE_dyn_ary_typename ## _len(
-    TEMPLATE_dyn_ary_typename *self
+MACRO_ARG_dyn_ary_typename_len(
+    MACRO_ARG_dyn_ary_typename *self
 )
 {
     return self->len;
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _insert_at(
-    TEMPLATE_dyn_ary_typename *dyn_ary,
+MACRO_ARG_dyn_ary_typename_insert_at(
+    MACRO_ARG_dyn_ary_typename *dyn_ary,
     TEMPLATE_datatype *to_insert,
     size_t index
 )
@@ -110,17 +110,17 @@ TEMPLATE_dyn_ary_typename ## _insert_at(
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _push_back(
-    TEMPLATE_dyn_ary_typename *dyn_ary,
+MACRO_ARG_dyn_ary_typename_push_back(
+    MACRO_ARG_dyn_ary_typename *dyn_ary,
     TEMPLATE_datatype *to_insert
 )
 {
-    return TEMPLATE_dyn_ary_typename ## _insert_at(dyn_ary, to_insert, dyn_ary->len);
+    return MACRO_ARG_dyn_ary_typename_insert_at(dyn_ary, to_insert, dyn_ary->len);
 }
 
 TEMPLATE_datatype *
-TEMPLATE_dyn_ary_typename ## _get(
-    TEMPLATE_dyn_ary_typename *dyn_ary,
+MACRO_ARG_dyn_ary_typename_get(
+    MACRO_ARG_dyn_ary_typename *dyn_ary,
     size_t idx
 )
 {
@@ -129,8 +129,8 @@ TEMPLATE_dyn_ary_typename ## _get(
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _rm(
-    TEMPLATE_dyn_ary_typename *dyn_ary,
+MACRO_ARG_dyn_ary_typename_rm(
+    MACRO_ARG_dyn_ary_typename *dyn_ary,
     size_t idx,
     TEMPLATE_datatype *removed_elem
 )
@@ -156,17 +156,17 @@ TEMPLATE_dyn_ary_typename ## _rm(
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _pop_back(
-    TEMPLATE_dyn_ary_typename *dyn_ary,
+MACRO_ARG_dyn_ary_typename_pop_back(
+    MACRO_ARG_dyn_ary_typename *dyn_ary,
     TEMPLATE_datatype *removed_elem
 )
 {
-    return TEMPLATE_dyn_ary_typename ## _rm(dyn_ary, dyn_ary->len - 1, removed_elem);
+    return MACRO_ARG_dyn_ary_typename_rm(dyn_ary, dyn_ary->len - 1, removed_elem);
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _lin_search(
-    TEMPLATE_dyn_ary_typename *dyn_ary,
+MACRO_ARG_dyn_ary_typename_lin_search(
+    MACRO_ARG_dyn_ary_typename *dyn_ary,
     TEMPLATE_datatype *elem,
     size_t *idx_if_found
 )
@@ -184,8 +184,8 @@ TEMPLATE_dyn_ary_typename ## _lin_search(
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _bin_search(
-    TEMPLATE_dyn_ary_typename *dyn_ary,
+MACRO_ARG_dyn_ary_typename_bin_search(
+    MACRO_ARG_dyn_ary_typename *dyn_ary,
     TEMPLATE_datatype *elem,
     size_t *idx_if_found
 )
@@ -219,8 +219,8 @@ TEMPLATE_dyn_ary_typename ## _bin_search(
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _trim(
-    TEMPLATE_dyn_ary_typename *dyn_ary
+MACRO_ARG_dyn_ary_typename_trim(
+    MACRO_ARG_dyn_ary_typename *dyn_ary
 )
 {
     uint8_t *new_buf = TEMPLATE_allocator_malloc(
@@ -236,9 +236,9 @@ TEMPLATE_dyn_ary_typename ## _trim(
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _cat(
-    TEMPLATE_dyn_ary_typename *first,
-    TEMPLATE_dyn_ary_typename *second
+MACRO_ARG_dyn_ary_typename_cat(
+    MACRO_ARG_dyn_ary_typename *first,
+    MACRO_ARG_dyn_ary_typename *second
 )
 {
     if(first->cap < first->len + second->len)
@@ -258,15 +258,15 @@ TEMPLATE_dyn_ary_typename ## _cat(
 }
 
 enum col_result
-TEMPLATE_dyn_ary_typename ## _sort_cmp(
-    TEMPLATE_dyn_ary_typename *to_sort,
+MACRO_ARG_dyn_ary_typename_sort_cmp(
+    MACRO_ARG_dyn_ary_typename *to_sort,
     col_sort_cmp_fn sort_fn
 )
 {
     return sort_fn(to_sort->allocator, to_sort->elem_metadata, to_sort->data, to_sort->len);
 }
 
-static enum col_result expand(TEMPLATE_dyn_ary_typename *dyn_ary)
+static enum col_result expand(MACRO_ARG_dyn_ary_typename *dyn_ary)
 {
     size_t new_cap = (size_t)((float)(dyn_ary->cap) * dyn_ary->growth_factor);
     if(new_cap == dyn_ary->cap) new_cap++;
