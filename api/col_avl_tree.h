@@ -9,7 +9,7 @@ struct col_avl_tree_node
 {
     struct col_avl_tree_node *left;
     struct col_avl_tree_node *right;
-    void *data;
+    uint8_t *data;
 };
 
 struct col_avl_tree
