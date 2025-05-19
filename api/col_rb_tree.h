@@ -5,22 +5,7 @@
 
 #include "col_result.h"
 
-enum col_rb_tree_node_color
-{
-    COL_RB_TREE_NODE_COLOR_RED,
-    COL_RB_TREE_NODE_COLOR_BLACK,
-
-    COL_RB_TREE_NODE_COLOR__COUNT
-};
-
-struct col_rb_tree_node
-{
-    struct col_rb_tree_node *parent;
-    struct col_rb_tree_node *left;
-    struct col_rb_tree_node *right;
-    enum col_rb_tree_node_color color;
-    void *data;
-};
+struct col_rb_tree_node;
 
 struct col_rb_tree
 {
@@ -67,7 +52,7 @@ enum col_result
 col_rb_tree_search(
     struct col_rb_tree *self,
     void *elem_to_search,
-    void *found_elem
+    void **found_elem
 );
 
 enum col_result

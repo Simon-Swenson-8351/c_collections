@@ -5,13 +5,30 @@
 #include "col_allocator_priv.h"
 #include "col_elem.h"
 
+enum node_color
+{
+    NODE_COLOR_RED,
+    NODE_COLOR_BLACK,
+
+    NODE_COLOR__COUNT
+};
+
+struct col_rb_tree_node
+{
+    struct col_rb_tree_node *parent;
+    struct col_rb_tree_node *left;
+    struct col_rb_tree_node *right;
+    enum node_color color;
+};
+
 static void node_clear(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_clear);
-static struct col_avl_tree_node *node_copy(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_copy);
+static struct col_rb_tree_node *node_copy(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_copy);
 static size_t node_count(struct col_rb_tree_node *node);
 static size_t node_depth(struct col_rb_tree_node *node);
-static void node_insert(struct col_rb_tree_node *dest_tree, struct col_rb_tree_node *to_insert);
-static enum col_rb_tree_node_color node_color(struct col_rb_tree_node *node);
-
+static enum node_color node_color(struct col_rb_tree_node *node);
+static void *node_data(struct col_rb_tree_node *node);
+static void fixup_after_insert(struct col_rb_tree_node *node);
+static struct col_rb_tree_node *uncle(struct col_rb_tree_node *node);
 /*
  *  This function is assumed to be called after a tree operation that causes a violation between grandparent->left 
  *  (parent) and grandparent->left->left (self). The rotation will go from:
@@ -151,18 +168,60 @@ col_rb_tree_insert(
     assert(node_to_insert);
     node_to_insert->left = NULL;
     node_to_insert->right = NULL;
-    node_to_insert->color = COL_RB_TREE_NODE_COLOR_RED;
-    node_to_insert->data = node_to_insert + 1;
-    memcpy(node_to_insert + 1, to_insert, self->elem_metadata->elem_size);
-    self->root = node_insert(self->root, node_to_insert);
+    node_to_insert->color = NODE_COLOR_RED;
+    memcpy(node_data(node_to_insert), to_insert, self->elem_metadata->elem_size);
+    struct col_rb_tree_node *parent = NULL;
+    struct col_rb_tree_node **insertion_point = &(self->root);
+    while(*insertion_point)
+    {
+        // a node already occupies the insertion point, keep descending.
+        if(col_elem_cmp(self->elem_metadata, node_data(*insertion_point), node_data(node_to_insert)) > 0)
+        {
+            // current > to_insert
+            parent = *insertion_point;
+            insertion_point = &((*insertion_point)->left);
+        }
+        else
+        {
+            // current <= to_insert
+            parent = *insertion_point;
+            insertion_point = &((*insertion_point)->right);
+        }
+    }
+    node_to_insert->parent = parent;
+    *insertion_point = node_to_insert;
+    rebalance(node_to_insert);
+    return COL_RESULT_SUCCESS;
 }
 
 enum col_result
 col_rb_tree_search(
     struct col_rb_tree *self,
     void *elem_to_search,
-    void *found_elem
-);
+    void **found_elem
+)
+{
+    struct col_rb_tree_node *cur = self->root;
+    while(cur)
+    {
+        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(cur), elem_to_search);
+        if(cmp_res < 0)
+        {
+            cur = cur->right;
+        }
+        else if(cmp_res == 0)
+        {
+            *found_elem = node_data(cur);
+            return COL_RESULT_SUCCESS;
+        }
+        else
+        {
+            cur = cur->left;
+        }
+    }
+    *found_elem = NULL;
+    return COL_RESULT_ELEM_NOT_FOUND;
+}
 
 enum col_result
 col_rb_tree_rm(
@@ -184,7 +243,7 @@ static void node_clear(struct col_allocator *allocator, struct col_elem_metadata
     if(!to_clear) return;
     node_clear(allocator, md, to_clear->left);
     node_clear(allocator, md, to_clear->right);
-    col_elem_clr(allocator, md, to_clear->data);
+    col_elem_clr(allocator, md, node_data(to_clear));
     col_allocator_free(allocator, to_clear);
 }
 
@@ -219,14 +278,9 @@ static size_t node_depth(struct col_rb_tree_node *node)
     else return dr + 1;
 }
 
-static void node_insert(struct col_rb_tree_node *dest_tree, struct col_rb_tree_node *to_insert)
+static enum node_color node_color(struct col_rb_tree_node *node)
 {
-
-}
-
-static enum col_rb_tree_node_color node_color(struct col_rb_tree_node *node)
-{
-    if(!node) return COL_RB_TREE_NODE_COLOR_BLACK;
+    if(!node) return NODE_COLOR_BLACK;
     return node->color;
 }
 
@@ -235,32 +289,157 @@ static struct col_rb_tree_node *node_rot_ll(struct col_rb_tree_node *grandparent
     assert(grandparent);
     assert(grandparent->left);
     assert(grandparent->left->left);
-    assert(node_color(grandparent) == COL_RB_TREE_NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left) == COL_RB_TREE_NODE_COLOR_RED);
-    assert(node_color(grandparent->left->left) == COL_RB_TREE_NODE_COLOR_RED);
-    assert(node_color(grandparent->right) == COL_RB_TREE_NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left->right) == COL_RB_TREE_NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left->left->left) == COL_RB_TREE_NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left->left->right) == COL_RB_TREE_NODE_COLOR_BLACK);
+    assert(node_color(grandparent) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left) == NODE_COLOR_RED);
+    assert(node_color(grandparent->left->left) == NODE_COLOR_RED);
+    assert(node_color(grandparent->right) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left->right) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left->left->left) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left->left->right) == NODE_COLOR_BLACK);
     struct col_rb_tree_node *grgrandparent = grandparent->parent;
     struct col_rb_tree_node *new_grandparent = grandparent->left;
-    struct col_rb_tree_node *new_l = grandparent->left->left;
     struct col_rb_tree_node *new_r = grandparent;
-    struct col_rb_tree_node *new_ll = grandparent->left->left->left;
-    struct col_rb_tree_node *new_lr = grandparent->left->left->right;
     struct col_rb_tree_node *new_rl = grandparent->left->right;
-    struct col_rb_tree_node *new_rr = grandparent->right;
     new_grandparent->parent = grgrandparent;
-    new_grandparent->left = new_l;
     new_grandparent->right = new_r;
-    new_grandparent->color = COL_RB_TREE_NODE_COLOR_BLACK;
-    new_l->parent = new_grandparent;
-    new_l->left = new_ll;
-    new_l->right = new_lr;
+    new_grandparent->color = NODE_COLOR_BLACK;
     new_r->parent = new_grandparent;
     new_r->left = new_rl;
-    new_r->right = new_rr;
-    new_r->color = COL_RB_TREE_NODE_COLOR_RED;
+    new_r->color = NODE_COLOR_RED;
     if(new_rl) new_rl->parent = new_r;
     return new_grandparent;
+}
+
+static struct col_rb_tree_node *node_rot_lr(struct col_rb_tree_node *grandparent)
+{
+    assert(grandparent);
+    assert(grandparent->left);
+    assert(grandparent->left->right);
+    assert(node_color(grandparent) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left) == NODE_COLOR_RED);
+    assert(node_color(grandparent->left->right) == NODE_COLOR_RED);
+    assert(node_color(grandparent->right) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left->left) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left->right->left) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left->right->right) == NODE_COLOR_BLACK);
+    struct col_rb_tree_node *grgrandparent = grandparent->parent;
+    struct col_rb_tree_node *new_grandparent = grandparent->left->right;
+    struct col_rb_tree_node *new_l = grandparent->left;
+    struct col_rb_tree_node *new_r = grandparent;
+    struct col_rb_tree_node *new_lr = grandparent->left->right->left;
+    struct col_rb_tree_node *new_rl = grandparent->left->right->right;
+    new_grandparent->parent = grgrandparent;
+    new_grandparent->left = new_l;
+    new_l->parent = new_grandparent;
+    new_grandparent->right = new_r;
+    new_r->parent = new_grandparent;
+    new_grandparent->color = NODE_COLOR_BLACK;
+    new_l->right = new_lr;
+    new_r->left = new_rl;
+    new_r->color = NODE_COLOR_RED;
+    if(new_lr) new_lr->parent = new_l;
+    if(new_rl) new_rl->parent = new_r;
+    return new_grandparent;
+}
+
+static struct col_rb_tree_node *node_rot_rl(struct col_rb_tree_node *grandparent)
+{
+    assert(grandparent);
+    assert(grandparent->right);
+    assert(grandparent->right->left);
+    assert(node_color(grandparent) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->right) == NODE_COLOR_RED);
+    assert(node_color(grandparent->right->left) == NODE_COLOR_RED);
+    assert(node_color(grandparent->right->right) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->right->left->left) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->right->left->right) == NODE_COLOR_BLACK);
+    struct col_rb_tree_node *grgrandparent = grandparent->parent;
+    struct col_rb_tree_node *new_grandparent = grandparent->right->left;
+    struct col_rb_tree_node *new_l = grandparent;
+    struct col_rb_tree_node *new_r = grandparent->right;
+    struct col_rb_tree_node *new_lr = grandparent->right->left->left;
+    struct col_rb_tree_node *new_rl = grandparent->right->left->right;
+    new_grandparent->parent = grgrandparent;
+    new_grandparent->left = new_l;
+    new_l->parent = new_grandparent;
+    new_grandparent->right = new_r;
+    new_r->parent = new_grandparent;
+    new_grandparent->color = NODE_COLOR_BLACK;
+    new_l->right = new_lr;
+    if(new_lr) new_lr->parent = new_l;
+    new_l->color = NODE_COLOR_RED;
+    new_r->left = new_rl;
+    if(new_rl) new_rl->parent = new_r;
+    return new_grandparent;
+}
+
+static struct col_rb_tree_node *node_rot_rr(struct col_rb_tree_node *grandparent)
+{
+    assert(grandparent);
+    assert(grandparent->right);
+    assert(grandparent->right->right);
+    assert(node_color(grandparent) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->left) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->right) == NODE_COLOR_RED);
+    assert(node_color(grandparent->right->left) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->right->right) == NODE_COLOR_RED);
+    assert(node_color(grandparent->right->right->left) == NODE_COLOR_BLACK);
+    assert(node_color(grandparent->right->right->right) == NODE_COLOR_BLACK);
+    struct col_rb_tree_node *grgrandparent = grandparent->parent;
+    struct col_rb_tree_node *new_grandparent = grandparent->right;
+    struct col_rb_tree_node *new_l = grandparent;
+    struct col_rb_tree_node *new_lr = grandparent->right->left;
+    new_grandparent->parent = grgrandparent;
+    new_grandparent->left = new_l;
+    new_l->parent = new_grandparent;
+    new_grandparent->color = NODE_COLOR_BLACK;
+    new_l->right = new_lr;
+    new_l->color = NODE_COLOR_RED;
+    if(new_lr) new_lr->parent = new_l;
+    return new_grandparent;
+}
+
+static void *node_data(struct col_rb_tree_node *node)
+{
+    assert(node);
+    return (void *)(node + 1);
+}
+
+static void fixup_after_insert(struct col_rb_tree_node *node)
+{
+    while(true)
+    {
+        if(!node->parent)
+        {
+            node->color = NODE_COLOR_BLACK;
+            return;
+        }
+        if(node_color(node) == NODE_COLOR_BLACK || node_color(node->parent) == NODE_COLOR_BLACK) return;
+        if(node_color(uncle(node)) == NODE_COLOR_RED)
+        {
+            node->parent->parent->color = NODE_COLOR_RED;
+            node->parent->parent->left->color = NODE_COLOR_BLACK;
+            node->parent->parent->right->color = NODE_COLOR_BLACK;
+            node = node->parent->parent;
+        }
+        else
+        {
+            if(node == node->parent->left)
+            {
+                if(node->parent == node->parent->parent->left) node = node_rot_ll(node->parent->parent);
+                else node = node_rot_rl(node->parent->parent);
+            }
+            else // node == node->parent->right
+            {
+                if(node->parent == node->parent->parent->left) node = node_rot_lr(node->parent->parent);
+                else node = node_rot_rr(node->parent->parent);
+            }
+        }
+    }
+}
+
+static struct col_rb_tree_node *uncle(struct col_rb_tree_node *node)
+{
+    return (node->parent == node->parent->parent->left) ? node->parent->parent->right : node->parent->parent->left;
 }
