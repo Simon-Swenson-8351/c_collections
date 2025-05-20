@@ -29,6 +29,10 @@ static enum node_color node_color(struct col_rb_tree_node *node);
 static void *node_data(struct col_rb_tree_node *node);
 static void fixup_after_insert(struct col_rb_tree_node *node);
 static struct col_rb_tree_node *uncle(struct col_rb_tree_node *node);
+static struct col_rb_tree_node *search_internal(struct col_rb_tree *self, void *elem_to_search);
+static struct col_rb_tree_node *node_succ(struct col_rb_tree_node *node);
+
+static void fixup_black_leaf_removal(struct col_rb_tree_node *node);
 /*
  *  This function is assumed to be called after a tree operation that causes a violation between grandparent->left 
  *  (parent) and grandparent->left->left (self). The rotation will go from:
@@ -190,7 +194,7 @@ col_rb_tree_insert(
     }
     node_to_insert->parent = parent;
     *insertion_point = node_to_insert;
-    rebalance(node_to_insert);
+    fixup_after_insert(node_to_insert);
     return COL_RESULT_SUCCESS;
 }
 
@@ -201,33 +205,61 @@ col_rb_tree_search(
     void **found_elem
 )
 {
-    struct col_rb_tree_node *cur = self->root;
-    while(cur)
-    {
-        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(cur), elem_to_search);
-        if(cmp_res < 0)
-        {
-            cur = cur->right;
-        }
-        else if(cmp_res == 0)
-        {
-            *found_elem = node_data(cur);
-            return COL_RESULT_SUCCESS;
-        }
-        else
-        {
-            cur = cur->left;
-        }
-    }
-    *found_elem = NULL;
-    return COL_RESULT_ELEM_NOT_FOUND;
+    *found_elem = search_internal(self, elem_to_search);
+    if(*found_elem) return COL_RESULT_SUCCESS;
+    else return COL_RESULT_ELEM_NOT_FOUND;
 }
 
 enum col_result
 col_rb_tree_rm(
     struct col_rb_tree *self,
+    void *elem_to_remove,
     void *removed_elem
-);
+)
+{
+    struct col_rb_tree_node *to_remove = search_internal(self, elem_to_remove);
+    if(!to_remove) return COL_RESULT_ELEM_NOT_FOUND;
+    memcpy(removed_elem, node_data(to_remove), self->elem_metadata->elem_size);
+    if(to_remove->left && to_remove->right)
+    {
+        struct col_rb_tree_node *succ = node_succ(to_remove);
+        memcpy(node_data(to_remove), node_data(succ), self->elem_metadata->elem_size);
+        to_remove = succ;
+    }
+    // We want the above case where we replace with successor to fall-through so a node is eventually removed.
+    if(to_remove->left)
+    {
+        to_remove->left->parent = to_remove->parent;
+        if(to_remove->parent)
+        {
+            if(to_remove->parent->left == to_remove) to_remove->parent->left = to_remove->left;
+            else to_remove->parent->right = to_remove->left;
+        }
+        to_remove->left->color = NODE_COLOR_BLACK;
+    }
+    else if(to_remove->right)
+    {
+        to_remove->right->parent = to_remove->parent;
+        if(to_remove->parent)
+        {
+            if(to_remove->parent->left == to_remove) to_remove->parent->left = to_remove->right;
+            else to_remove->parent->right = to_remove->right;
+        }
+        to_remove->right->color = NODE_COLOR_BLACK;
+    }
+    else
+    {
+        if(to_remove->parent)
+        {
+            if(to_remove->parent->left == to_remove) to_remove->parent->left = NULL;
+            else to_remove->parent->right = NULL;
+        }
+        if(node_color(to_remove) == NODE_COLOR_BLACK) fixup_black_leaf_removal(to_remove);
+    }
+
+    col_allocator_free(self->allocator, to_remove);
+    return COL_RESULT_SUCCESS;
+}
 
 // first will contain all elements
 // second will be cleared
@@ -442,4 +474,38 @@ static void fixup_after_insert(struct col_rb_tree_node *node)
 static struct col_rb_tree_node *uncle(struct col_rb_tree_node *node)
 {
     return (node->parent == node->parent->parent->left) ? node->parent->parent->right : node->parent->parent->left;
+}
+
+static struct col_rb_tree_node *search_internal(struct col_rb_tree *self, void *elem_to_search)
+{
+    struct col_rb_tree_node *cur = self->root;
+    while(cur)
+    {
+        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(cur), elem_to_search);
+        if(cmp_res < 0)
+        {
+            cur = cur->right;
+        }
+        else if(cmp_res == 0)
+        {
+            return cur;
+        }
+        else
+        {
+            cur = cur->left;
+        }
+    }
+    return NULL;
+}
+
+static struct col_rb_tree_node *node_succ(struct col_rb_tree_node *node)
+{
+    node = node->right;
+    while(node->left) node = node->left;
+    return node;
+}
+
+static void fixup_black_leaf_removal(struct col_rb_tree_node *node)
+{
+
 }

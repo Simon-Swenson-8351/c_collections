@@ -58,6 +58,7 @@ col_rb_tree_search(
 enum col_result
 col_rb_tree_rm(
     struct col_rb_tree *self,
+    void *elem_to_remove,
     void *removed_elem
 );
 
