@@ -1,5 +1,6 @@
 #include "col_rb_tree_priv.h"
 
+#include <stddef.h>
 #include <string.h>
 
 #include "col_allocator_priv.h"
@@ -13,24 +14,44 @@ enum node_color
     NODE_COLOR__COUNT
 };
 
+enum node_child_pos
+{
+    NCP_LEFT,
+    NCP_RIGHT,
+
+    NCD__COUNT
+};
+
+enum node_color_combo
+{
+    NCC_RED_RED,
+    NCC_BLACK_RED,
+    NCC_RED_BLACK,
+    NCC_BLACK_BLACK,
+    
+    NCC__COUNT
+};
+
 struct col_rb_tree_node
 {
     struct col_rb_tree_node *parent;
-    struct col_rb_tree_node *left;
-    struct col_rb_tree_node *right;
+    struct col_rb_tree_node *children[2];
     enum node_color color;
 };
+
+#define LEFT_CHILD(node) node->children[(ptrdiff_t)NCP_LEFT]
+#define RIGHT_CHILD(node) node->children[(ptrdiff_t)NCP_RIGHT]
 
 static void node_clear(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_clear);
 static struct col_rb_tree_node *node_copy(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_copy);
 static enum node_color node_color(struct col_rb_tree_node *node);
 static void *node_data(struct col_rb_tree_node *node);
-static void fixup_after_insert(struct col_rb_tree_node *node);
+static void handle_red_violation(struct col_rb_tree_node *node);
 static struct col_rb_tree_node *uncle(struct col_rb_tree_node *node);
-static struct col_rb_tree_node *search_internal(struct col_rb_tree *self, void *elem_to_search);
-static struct col_rb_tree_node *node_succ(struct col_rb_tree_node *node);
+static enum node_color_combo childrens_colors(struct col_rb_tree_node *node);
 
-static void fixup_black_leaf_removal(struct col_rb_tree_node *node);
+static void handle_black_violation(struct col_rb_tree *tree, struct col_rb_tree_node *parent, enum node_child_pos violator_pos);
+static void handle_black_excess(struct col_rb_tree *tree, struct col_rb_tree_node *parent, enum node_child_pos exceeder_pos);
 // Preconditions: node is not NULL, node->right is not NULL
 static struct col_rb_tree_node *rotate_from_r(struct col_rb_tree *tree, struct col_rb_tree_node *node);
 // Preconditions: node is not NULL, node->left is not NULL
@@ -108,9 +129,8 @@ col_rb_tree_insert(
     assert(self);
     assert(to_insert);
     struct col_rb_tree_node *node_to_insert = col_allocator_malloc(self->allocator, sizeof(struct col_rb_tree_node) + self->elem_metadata->elem_size);
-    assert(node_to_insert);
-    node_to_insert->left = NULL;
-    node_to_insert->right = NULL;
+    if(!node_to_insert) return COL_RESULT_ALLOC_FAILED;
+    memset(node_to_insert->children, 0x00, sizeof(node_to_insert->children));
     node_to_insert->color = NODE_COLOR_RED;
     memcpy(node_data(node_to_insert), to_insert, self->elem_metadata->elem_size);
     struct col_rb_tree_node *parent = NULL;
@@ -122,18 +142,18 @@ col_rb_tree_insert(
         {
             // current > to_insert
             parent = *insertion_point;
-            insertion_point = &((*insertion_point)->left);
+            insertion_point = (*insertion_point)->children + NCP_LEFT;
         }
         else
         {
             // current <= to_insert
             parent = *insertion_point;
-            insertion_point = &((*insertion_point)->right);
+            insertion_point = (*insertion_point)->children + NCP_RIGHT;
         }
     }
     node_to_insert->parent = parent;
     *insertion_point = node_to_insert;
-    fixup_after_insert(node_to_insert);
+    handle_red_violation(node_to_insert);
     return COL_RESULT_SUCCESS;
 }
 
@@ -144,9 +164,27 @@ col_rb_tree_search(
     void **found_elem
 )
 {
-    *found_elem = search_internal(self, elem_to_search);
-    if(*found_elem) return COL_RESULT_SUCCESS;
-    else return COL_RESULT_ELEM_NOT_FOUND;
+
+    struct col_rb_tree_node *cur = self->root;
+    while(cur)
+    {
+        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(cur), elem_to_search);
+        if(cmp_res < 0)
+        {
+            cur = right_child(cur);
+        }
+        else if(cmp_res == 0)
+        {
+            break;
+        }
+        else
+        {
+            cur = left_child(cur);
+        }
+    }
+    if(!cur) return COL_RESULT_ELEM_NOT_FOUND;
+    *found_elem = node_data(cur);
+    return COL_RESULT_SUCCESS;
 }
 
 enum col_result
@@ -156,57 +194,66 @@ col_rb_tree_remove(
     void *removed_elem
 )
 {
-    struct col_rb_tree_node *to_remove = search_internal(self, elem_to_remove);
-    if(!to_remove) return COL_RESULT_ELEM_NOT_FOUND;
-    memcpy(removed_elem, node_data(to_remove), self->elem_metadata->elem_size);
-    if(to_remove->left && to_remove->right)
+    enum node_child_pos cur_pos;
+    struct col_rb_tree_node **removal_point = &(self->root);
+    while(*removal_point)
     {
-        struct col_rb_tree_node *succ = node_succ(to_remove);
-        memcpy(node_data(to_remove), node_data(succ), self->elem_metadata->elem_size);
-        to_remove = succ;
-    }
-    // We want the above case where we replace with successor to fall-through so a node is eventually removed.
-    if(to_remove->left)
-    {
-        to_remove->left->parent = to_remove->parent;
-        if(to_remove->parent)
+        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(*removal_point), elem_to_remove);
+        if(cmp_res < 0)
         {
-            if(to_remove->parent->left == to_remove) to_remove->parent->left = to_remove->left;
-            else to_remove->parent->right = to_remove->left;
+            cur_pos = NCP_RIGHT;
+            removal_point = (*removal_point)->children + NCP_RIGHT;
         }
-        to_remove->left->color = NODE_COLOR_BLACK;
+        else if(cmp_res == 0)
+        {
+            break;
+        }
+        else
+        {
+            cur_pos = NCP_LEFT;
+            removal_point = (*removal_point)->children + NCP_LEFT;
+        }
+    }
+    if(!(*removal_point)) return COL_RESULT_ELEM_NOT_FOUND;
+    memcpy(removed_elem, node_data(*removal_point), self->elem_metadata->elem_size);
+    if(left_child(*removal_point) && right_child(*removal_point))
+    {
+        struct col_rb_tree_node **succ_ptr = (*removal_point)->children + NCP_RIGHT;
+        cur_pos = NCP_RIGHT;
+        while(left_child(*succ_ptr))
+        {
+            succ_ptr = (*succ_ptr)->children + NCP_LEFT;
+            cur_pos = NCP_LEFT;
+        }
+        memcpy(node_data(*removal_point), node_data(*succ_ptr), self->elem_metadata->elem_size);
+        removal_point = succ_ptr;
+    }
+    // We want the above case where we replace with successor to fall-through so that a node is eventually removed.
+    struct col_rb_tree_node *to_remove = *removal_point;
+    if(left_child(to_remove))
+    {
+        *removal_point = left_child(*removal_point);
+        to_remove->children[NCP_LEFT]->parent = to_remove->parent;
+        to_remove->children[NCP_LEFT]->color = NODE_COLOR_BLACK;
     }
     else if(to_remove->right)
     {
+        *removal_point = to_remove->right;
         to_remove->right->parent = to_remove->parent;
-        if(to_remove->parent)
-        {
-            if(to_remove->parent->left == to_remove) to_remove->parent->left = to_remove->right;
-            else to_remove->parent->right = to_remove->right;
-        }
         to_remove->right->color = NODE_COLOR_BLACK;
     }
     else
     {
-        if(to_remove->parent)
+        *removal_point = NULL;
+        if(node_color(to_remove) == NODE_COLOR_BLACK)
         {
-            if(to_remove->parent->left == to_remove) to_remove->parent->left = NULL;
-            else to_remove->parent->right = NULL;
+            handle_black_violation(self, to_remove->parent, to_remove);
         }
-        if(node_color(to_remove) == NODE_COLOR_BLACK) fixup_black_leaf_removal(to_remove);
     }
 
     col_allocator_free(self->allocator, to_remove);
     return COL_RESULT_SUCCESS;
 }
-
-// first will contain all elements
-// second will be cleared
-enum col_result
-col_rb_tree_merge(
-    struct col_rb_tree *first,
-    struct col_rb_tree *second
-);
 
 enum col_result
 col_rb_tree_for_each(
@@ -312,16 +359,12 @@ static void *node_data(struct col_rb_tree_node *node)
     return (void *)(node + 1);
 }
 
-static void fixup_after_insert(struct col_rb_tree_node *node)
+static void handle_red_violation(struct col_rb_tree_node *node)
 {
-    while(true)
+    // node is red and node->parent is red
+    while(node_color(node->parent) == NODE_COLOR_RED)
     {
-        if(!node->parent)
-        {
-            node->color = NODE_COLOR_BLACK;
-            return;
-        }
-        if(node_color(node) == NODE_COLOR_BLACK || node_color(node->parent) == NODE_COLOR_BLACK) return;
+        // Note: Grandparent exists since parent is red and the root cannot be red.
         if(node_color(uncle(node)) == NODE_COLOR_RED)
         {
             node->parent->parent->color = NODE_COLOR_RED;
@@ -331,9 +374,19 @@ static void fixup_after_insert(struct col_rb_tree_node *node)
         }
         else
         {
-            // gp is black
-            // parent is red
-            // cur is red
+            /*
+             *  gp is black
+             *      parent is red
+             *          cur is red
+             *              c1 is black, since the red violations of the subtree would have been cleaned up in a previous iteration
+             *              c2 is black, since the red violations of the subtree would have been cleaned up in a previous iteration
+             *          sibling is black
+             *      uncle is black
+             * 
+             *  Note that a rotation on gp, parent, cur will result in the lower level of the tree (grandchild level)
+             *  being c1, c2, sibling, and uncle, which are all black. Therefore, setting the next level up (child 
+             *  level) to red will not cause a violation farther down the tree.
+             */
             if(node == node->parent->left)
             {
                 if(node->parent == node->parent->parent->left)
@@ -359,6 +412,7 @@ static void fixup_after_insert(struct col_rb_tree_node *node)
             node->color = NODE_COLOR_BLACK;
             node->left->color = NODE_COLOR_RED;
             node->right->color = NODE_COLOR_RED;
+            return;
         }
     }
 }
@@ -368,36 +422,146 @@ static struct col_rb_tree_node *uncle(struct col_rb_tree_node *node)
     return (node->parent == node->parent->parent->left) ? node->parent->parent->right : node->parent->parent->left;
 }
 
-static struct col_rb_tree_node *search_internal(struct col_rb_tree *self, void *elem_to_search)
+static void handle_black_violation(struct col_rb_tree *tree, struct col_rb_tree_node *parent, struct col_rb_tree_node *violator)
 {
-    struct col_rb_tree_node *cur = self->root;
-    while(cur)
+    assert(tree);
+    assert(violator);
+    while(true)
     {
-        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(cur), elem_to_search);
-        if(cmp_res < 0)
+        if(!parent) return;
+        struct col_rb_tree_node *sibling = (parent->left == violator) ? parent->right : parent->left;
+        if(node_color(parent) == NODE_COLOR_RED)
         {
-            cur = cur->right;
-        }
-        else if(cmp_res == 0)
-        {
-            return cur;
+            if(node_color(sibling->left) == NODE_COLOR_RED)
+            {
+                if(violator == parent->left) parent = rotate_from_rl(tree, parent);
+                else parent = rotate_from_l(tree, parent);
+                parent->color = NODE_COLOR_RED;
+                parent->left->color = NODE_COLOR_BLACK;
+                parent->right->color = NODE_COLOR_BLACK;
+                return;
+            }
+            else if(node_color(sibling->right) == NODE_COLOR_RED)
+            {
+                if(violator == parent->left) parent = rotate_from_r(tree, parent);
+                else parent = rotate_from_lr(tree, parent);
+                parent->color = NODE_COLOR_RED;
+                parent->left->color = NODE_COLOR_BLACK;
+                parent->right->color = NODE_COLOR_BLACK;
+                return;
+            }
+            else
+            {
+                parent->color = NODE_COLOR_BLACK;
+                sibling->color = NODE_COLOR_RED;
+                return;
+            }
         }
         else
         {
-            cur = cur->left;
+            if(node_color(sibling) == NODE_COLOR_RED)
+            {
+                if(violator == parent->left)
+                {
+                    sibling->color = NODE_COLOR_BLACK;
+                    parent = rotate_from_r(tree, parent);
+                    handle_black_excess(tree, parent->left, parent->left->right);
+                    return;
+                }
+                else
+                {
+                    sibling->color = NODE_COLOR_BLACK;
+                    parent = rotate_from_l(tree, parent);
+                    handle_black_excess(tree, parent->right, parent->right->left);
+                    return;
+                }
+            }
+            else
+            {
+                if(node_color(sibling->left) == NODE_COLOR_RED)
+                {
+                    if(violator == parent->left) parent = rotate_from_rl(tree, parent);
+                    else parent = rotate_from_l(tree, parent);
+                    parent->color = NODE_COLOR_BLACK;
+                    parent->left->color = NODE_COLOR_BLACK;
+                    parent->right->color = NODE_COLOR_BLACK;
+                    return;
+                }
+                else if(node_color(sibling->right) == NODE_COLOR_RED)
+                {
+                    if(violator == parent->left) parent = rotate_from_r(tree, parent);
+                    else parent = rotate_from_lr(tree, parent);
+                    parent->color = NODE_COLOR_BLACK;
+                    parent->left->color = NODE_COLOR_BLACK;
+                    parent->right->color = NODE_COLOR_BLACK;
+                    return;
+                }
+                else
+                {
+                    sibling->color = NODE_COLOR_RED;
+                    violator = parent;
+                    parent = parent->parent;
+                    continue;
+                }
+            }
         }
     }
-    return NULL;
 }
 
-static struct col_rb_tree_node *node_succ(struct col_rb_tree_node *node)
+static void handle_black_excess(struct col_rb_tree *tree, struct col_rb_tree_node *parent, enum node_child_pos exceeder_pos)
 {
-    node = node->right;
-    while(node->left) node = node->left;
-    return node;
+    assert(tree);
+    assert(parent);
+    enum node_color_combo gc_colors;
+    switch(exceeder_pos)
+    {
+        case NCP_LEFT:
+            gc_colors = childrens_colors(parent->left);
+            switch(gc_colors)
+            {
+                case NCC_RED_RED:
+                    // intentional fall-through
+                case NCC_BLACK_RED:
+                    parent = rotate_from_lr(tree, parent);
+                    goto fixup_red_colors;
+                    break;
+                case NCC_RED_BLACK:
+                    parent = rotate_from_l(tree, parent);
+                    goto fixup_red_colors;
+                    break;
+                case NCC_BLACK_BLACK:
+                    parent->left->color = NODE_COLOR_RED;
+                    break;
+            }
+            break;
+        case NCP_RIGHT:
+            gc_colors = childrens_colors(parent->right);
+            switch(gc_colors)
+            {
+                case NCC_RED_RED:
+                    // intentional fall-through
+                case NCC_BLACK_RED:
+                    parent = rotate_from_lr(tree, parent);
+                    goto fixup_red_colors;
+                    break;
+                case NCC_RED_BLACK:
+                    parent = rotate_from_l(tree, parent);
+                    goto fixup_red_colors;
+                    break;
+                case NCC_BLACK_BLACK:
+                    parent->left->color = NODE_COLOR_RED;
+                    break;
+            }
+    }
+    return;
+fixup_red_colors:
+    parent->color = NODE_COLOR_RED;
+    parent->left->color = NODE_COLOR_BLACK;
+    parent->right->color = NODE_COLOR_BLACK;
 }
 
-static void fixup_black_leaf_removal(struct col_rb_tree_node *node)
+static enum node_color_combo childrens_colors(struct col_rb_tree_node *node)
 {
-
+    assert(node);
+    return (node_color(node->children + NCP_LEFT) << NCP_LEFT) | (node_color(node->children + NCP_RIGHT) << NCP_RIGHT);
 }
