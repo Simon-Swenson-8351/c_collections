@@ -1,10 +1,13 @@
 #pragma once
 
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "col_result.h"
 
+struct col_allocator;
+struct col_elem_metadata;
 struct col_rb_tree_node;
 
 struct col_rb_tree
@@ -32,16 +35,6 @@ col_rb_tree_clear(
     struct col_rb_tree *to_clear
 );
 
-size_t
-col_rb_tree_count(
-    struct col_rb_tree *self
-);
-
-size_t
-col_rb_tree_depth(
-    struct col_rb_tree *self
-);
-
 enum col_result
 col_rb_tree_insert(
     struct col_rb_tree *self,
@@ -56,10 +49,17 @@ col_rb_tree_search(
 );
 
 enum col_result
-col_rb_tree_rm(
+col_rb_tree_remove(
     struct col_rb_tree *self,
     void *elem_to_remove,
     void *removed_elem
+);
+
+enum col_result
+col_rb_tree_for_each(
+    struct col_rb_tree *self,
+    void *closure_context,
+    bool(*closure)(void *context, void *elem)
 );
 
 // first will contain all elements

@@ -23,8 +23,6 @@ struct col_rb_tree_node
 
 static void node_clear(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_clear);
 static struct col_rb_tree_node *node_copy(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_copy);
-static size_t node_count(struct col_rb_tree_node *node);
-static size_t node_depth(struct col_rb_tree_node *node);
 static enum node_color node_color(struct col_rb_tree_node *node);
 static void *node_data(struct col_rb_tree_node *node);
 static void fixup_after_insert(struct col_rb_tree_node *node);
@@ -33,81 +31,38 @@ static struct col_rb_tree_node *search_internal(struct col_rb_tree *self, void *
 static struct col_rb_tree_node *node_succ(struct col_rb_tree_node *node);
 
 static void fixup_black_leaf_removal(struct col_rb_tree_node *node);
+// Preconditions: node is not NULL, node->right is not NULL
+static struct col_rb_tree_node *rotate_from_r(struct col_rb_tree *tree, struct col_rb_tree_node *node);
+// Preconditions: node is not NULL, node->left is not NULL
+static struct col_rb_tree_node *rotate_from_l(struct col_rb_tree *tree, struct col_rb_tree_node *node);
 /*
- *  This function is assumed to be called after a tree operation that causes a violation between grandparent->left 
- *  (parent) and grandparent->left->left (self). The rotation will go from:
- *        B
- *       / \
- *      R   B
- *     / \
- *    R   B
+ *  Preconditions: node, node->left, and node->left->right are not NULL
+ *  Pattern 2:
+ *    C <- node
+ *   /
+ *  A
+ *   \
+ *    B
+ *  To:
+ *    B <- return value
  *   / \
- *  B   B
- *  to:
- *        B
- *      /   \
- *    R       R
- *   / \     / \
- *  B   B   B   B
+ *  A   C
  */
-static struct col_rb_tree_node *node_rot_ll(struct col_rb_tree_node *grandparent);
-
+static struct col_rb_tree_node *rotate_from_lr(struct col_rb_tree *tree, struct col_rb_tree_node *node);
 /*
- *  This function is assumed to be called after a tree operation that causes a violation between grandparent->left 
- *  (parent) and grandparent->left->right (self). The rotation will go from:
- *        B
- *       / \
- *      R   B
- *     / \
- *    B   R
- *       / \
- *      B   B
- *  to:
- *        B
- *      /   \
- *    R       R
- *   / \     / \
- *  B   B   B   B
+ *  Preconditions: node, node->right, and node->right->left are not NULL
+ *  From:
+ *  A <- node
+ *   \
+ *    C
+ *   /
+ *  B
+ *  To:
+ *    B <- return value
+ *   / \
+ *  A   C
  */
-static struct col_rb_tree_node *node_rot_lr(struct col_rb_tree_node *grandparent);
-
-/*
- *  This function is assumed to be called after a tree operation that causes a violation between grandparent->right 
- *  (parent) and grandparent->right->left (self). The rotation will go from:
- *        B
- *       / \
- *      B   R
- *         / \
- *        R   B
- *       / \
- *      B   B
- *  to:
- *        B
- *      /   \
- *    R       R
- *   / \     / \
- *  B   B   B   B
- */
-static struct col_rb_tree_node *node_rot_rl(struct col_rb_tree_node *grandparent);
-
-/*
- *  This function is assumed to be called after a tree operation that causes a violation between grandparent->right 
- *  (parent) and grandparent->right->right (self). The rotation will go from:
- *        B
- *       / \
- *      B   R
- *         / \
- *        B   R
- *           / \
- *          B   B
- *  to:
- *        B
- *      /   \
- *    R       R
- *   / \     / \
- *  B   B   B   B
- */
-static struct col_rb_tree_node *node_rot_rr(struct col_rb_tree_node *grandparent);
+static struct col_rb_tree_node *rotate_from_rl(struct col_rb_tree *tree, struct col_rb_tree_node *node);
 
 enum col_result
 col_rb_tree_init(
@@ -142,22 +97,6 @@ col_rb_tree_clear(
 )
 {
     node_clear(to_clear->allocator, to_clear->elem_metadata, to_clear->root);
-}
-
-size_t
-col_rb_tree_count(
-    struct col_rb_tree *self
-)
-{
-    return node_count(self->root);
-}
-
-size_t
-col_rb_tree_depth(
-    struct col_rb_tree *self
-)
-{
-    return node_depth(self->root);
 }
 
 enum col_result
@@ -211,7 +150,7 @@ col_rb_tree_search(
 }
 
 enum col_result
-col_rb_tree_rm(
+col_rb_tree_remove(
     struct col_rb_tree *self,
     void *elem_to_remove,
     void *removed_elem
@@ -269,6 +208,12 @@ col_rb_tree_merge(
     struct col_rb_tree *second
 );
 
+enum col_result
+col_rb_tree_for_each(
+    struct col_rb_tree *self,
+    void *closure_context,
+    bool(*closure)(void *context, void *elem)
+);
 
 static void node_clear(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_clear)
 {
@@ -295,141 +240,70 @@ static struct col_rb_tree_node *node_copy(struct col_allocator *allocator, struc
     return result;
 }
 
-static size_t node_count(struct col_rb_tree_node *node)
-{
-    if(!node) return 0;
-    return node_count(node->left) + node_count(node->right) + 1;
-}
-
-static size_t node_depth(struct col_rb_tree_node *node)
-{
-    if(!node) return 0;
-    size_t dl = node_depth(node->left);
-    size_t dr = node_depth(node->right);
-    if(dl > dr) return dl + 1;
-    else return dr + 1;
-}
-
 static enum node_color node_color(struct col_rb_tree_node *node)
 {
     if(!node) return NODE_COLOR_BLACK;
     return node->color;
 }
 
-static struct col_rb_tree_node *node_rot_ll(struct col_rb_tree_node *grandparent)
+static struct col_rb_tree_node *rotate_from_r(struct col_rb_tree *tree, struct col_rb_tree_node *node)
 {
-    assert(grandparent);
-    assert(grandparent->left);
-    assert(grandparent->left->left);
-    assert(node_color(grandparent) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left) == NODE_COLOR_RED);
-    assert(node_color(grandparent->left->left) == NODE_COLOR_RED);
-    assert(node_color(grandparent->right) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left->right) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left->left->left) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left->left->right) == NODE_COLOR_BLACK);
-    struct col_rb_tree_node *grgrandparent = grandparent->parent;
-    struct col_rb_tree_node *new_grandparent = grandparent->left;
-    struct col_rb_tree_node *new_r = grandparent;
-    struct col_rb_tree_node *new_rl = grandparent->left->right;
-    new_grandparent->parent = grgrandparent;
-    new_grandparent->right = new_r;
-    new_grandparent->color = NODE_COLOR_BLACK;
-    new_r->parent = new_grandparent;
-    new_r->left = new_rl;
-    new_r->color = NODE_COLOR_RED;
-    if(new_rl) new_rl->parent = new_r;
-    return new_grandparent;
+    assert(tree);
+    assert(node);
+    assert(node->right);
+    if(node->parent)
+    {
+        if(node->parent->left == node) node->parent->left = node->right;
+        else node->parent->right = node->right;
+    }
+    else
+    {
+        tree->root = node->right;
+    }
+    node->right->parent = node->parent;
+    struct col_rb_tree_node *new_top = node->right;
+    node->right = new_top->left;
+    if(node->right) node->right->parent = node;
+    new_top->left = node;
+    node->parent = new_top;
+    return new_top;
 }
 
-static struct col_rb_tree_node *node_rot_lr(struct col_rb_tree_node *grandparent)
+static struct col_rb_tree_node *rotate_from_l(struct col_rb_tree *tree, struct col_rb_tree_node *node)
 {
-    assert(grandparent);
-    assert(grandparent->left);
-    assert(grandparent->left->right);
-    assert(node_color(grandparent) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left) == NODE_COLOR_RED);
-    assert(node_color(grandparent->left->right) == NODE_COLOR_RED);
-    assert(node_color(grandparent->right) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left->left) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left->right->left) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left->right->right) == NODE_COLOR_BLACK);
-    struct col_rb_tree_node *grgrandparent = grandparent->parent;
-    struct col_rb_tree_node *new_grandparent = grandparent->left->right;
-    struct col_rb_tree_node *new_l = grandparent->left;
-    struct col_rb_tree_node *new_r = grandparent;
-    struct col_rb_tree_node *new_lr = grandparent->left->right->left;
-    struct col_rb_tree_node *new_rl = grandparent->left->right->right;
-    new_grandparent->parent = grgrandparent;
-    new_grandparent->left = new_l;
-    new_l->parent = new_grandparent;
-    new_grandparent->right = new_r;
-    new_r->parent = new_grandparent;
-    new_grandparent->color = NODE_COLOR_BLACK;
-    new_l->right = new_lr;
-    new_r->left = new_rl;
-    new_r->color = NODE_COLOR_RED;
-    if(new_lr) new_lr->parent = new_l;
-    if(new_rl) new_rl->parent = new_r;
-    return new_grandparent;
+    assert(tree);
+    assert(node);
+    assert(node->left);
+    if(node->parent)
+    {
+        if(node->parent->left == node) node->parent->left = node->right;
+        else node->parent->right = node->right;
+    }
+    else
+    {
+        tree->root = node->right;
+    }
+    node->left->parent = node->parent;
+    struct col_rb_tree_node *new_top = node->left;
+    node->left = new_top->right;
+    if(node->left) node->left->parent = node;
+    new_top->right = node;
+    node->parent = new_top;
+    return new_top;
 }
 
-static struct col_rb_tree_node *node_rot_rl(struct col_rb_tree_node *grandparent)
+static struct col_rb_tree_node *rotate_from_lr(struct col_rb_tree *tree, struct col_rb_tree_node *node)
 {
-    assert(grandparent);
-    assert(grandparent->right);
-    assert(grandparent->right->left);
-    assert(node_color(grandparent) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->right) == NODE_COLOR_RED);
-    assert(node_color(grandparent->right->left) == NODE_COLOR_RED);
-    assert(node_color(grandparent->right->right) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->right->left->left) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->right->left->right) == NODE_COLOR_BLACK);
-    struct col_rb_tree_node *grgrandparent = grandparent->parent;
-    struct col_rb_tree_node *new_grandparent = grandparent->right->left;
-    struct col_rb_tree_node *new_l = grandparent;
-    struct col_rb_tree_node *new_r = grandparent->right;
-    struct col_rb_tree_node *new_lr = grandparent->right->left->left;
-    struct col_rb_tree_node *new_rl = grandparent->right->left->right;
-    new_grandparent->parent = grgrandparent;
-    new_grandparent->left = new_l;
-    new_l->parent = new_grandparent;
-    new_grandparent->right = new_r;
-    new_r->parent = new_grandparent;
-    new_grandparent->color = NODE_COLOR_BLACK;
-    new_l->right = new_lr;
-    if(new_lr) new_lr->parent = new_l;
-    new_l->color = NODE_COLOR_RED;
-    new_r->left = new_rl;
-    if(new_rl) new_rl->parent = new_r;
-    return new_grandparent;
+    assert(node);
+    rotate_from_r(tree, node->left);
+    return rotate_from_l(tree, node);
 }
 
-static struct col_rb_tree_node *node_rot_rr(struct col_rb_tree_node *grandparent)
+static struct col_rb_tree_node *rotate_from_rl(struct col_rb_tree *tree, struct col_rb_tree_node *node)
 {
-    assert(grandparent);
-    assert(grandparent->right);
-    assert(grandparent->right->right);
-    assert(node_color(grandparent) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->left) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->right) == NODE_COLOR_RED);
-    assert(node_color(grandparent->right->left) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->right->right) == NODE_COLOR_RED);
-    assert(node_color(grandparent->right->right->left) == NODE_COLOR_BLACK);
-    assert(node_color(grandparent->right->right->right) == NODE_COLOR_BLACK);
-    struct col_rb_tree_node *grgrandparent = grandparent->parent;
-    struct col_rb_tree_node *new_grandparent = grandparent->right;
-    struct col_rb_tree_node *new_l = grandparent;
-    struct col_rb_tree_node *new_lr = grandparent->right->left;
-    new_grandparent->parent = grgrandparent;
-    new_grandparent->left = new_l;
-    new_l->parent = new_grandparent;
-    new_grandparent->color = NODE_COLOR_BLACK;
-    new_l->right = new_lr;
-    new_l->color = NODE_COLOR_RED;
-    if(new_lr) new_lr->parent = new_l;
-    return new_grandparent;
+    assert(node);
+    rotate_from_l(tree, node->right);
+    return rotate_from_r(tree, node);
 }
 
 static void *node_data(struct col_rb_tree_node *node)
@@ -457,16 +331,34 @@ static void fixup_after_insert(struct col_rb_tree_node *node)
         }
         else
         {
+            // gp is black
+            // parent is red
+            // cur is red
             if(node == node->parent->left)
             {
-                if(node->parent == node->parent->parent->left) node = node_rot_ll(node->parent->parent);
-                else node = node_rot_rl(node->parent->parent);
+                if(node->parent == node->parent->parent->left)
+                {
+                    node = node_rot_ll(node->parent->parent);
+                }
+                else
+                {
+                    node = node_rot_rl(node->parent->parent);
+                }
             }
             else // node == node->parent->right
             {
-                if(node->parent == node->parent->parent->left) node = node_rot_lr(node->parent->parent);
-                else node = node_rot_rr(node->parent->parent);
+                if(node->parent == node->parent->parent->left)
+                {
+                    node = node_rot_lr(node->parent->parent);
+                }
+                else
+                {
+                    node = node_rot_rr(node->parent->parent);
+                }
             }
+            node->color = NODE_COLOR_BLACK;
+            node->left->color = NODE_COLOR_RED;
+            node->right->color = NODE_COLOR_RED;
         }
     }
 }
