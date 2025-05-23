@@ -46,12 +46,11 @@ Case 2: cur is black
 
                cur,B                          c2,B
               /     \                        /    \
-            c1       c2,R        ->     cur,B      gc2,B
+            c1       c2,R        ->     cur,R      gc2,B
                     /    \             /     \
                gc1,B      gc2,B      c1       gc1,B
 
-        At this point, the path from the top of this sub-tree to gc1 has one too many black nodes, and gc1 must be 
-        corrected. Call child_needs_red(cur, gc1).
+        Apply case 1 code (when cur is red) to the mutated tree.
         This satisfies the black violation, and the algorithm can end.
     Case 2.2: c2 is black
         Case 2.2.1: gc1, gc2 are black
@@ -72,11 +71,3 @@ Case 2: cur is black
                 ggc1,B       ggc2,B
 
             This satisfies the black violation.
-
-child_needs_red(cur, c2):
-    Precondition: cur, c2 are black and not null.
-    Call the grandchildren of c2 "gc1" and "gc2."
-    Case 1: gc1 and gc2 are black
-        c2.color <- red
-    Case 2: either gc1 or gc2 is red, call it gcr
-        Perform the rotation from Case 1.2 cur, c2, gcn
