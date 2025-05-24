@@ -1,5 +1,6 @@
 #include "col_rb_tree_priv.h"
 
+#include <assert.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -87,9 +88,11 @@ col_rb_tree_init(
 {
     assert(to_init);
     assert(elem_metadata);
+    assert(elem_metadata->cmp_fn);
     to_init->allocator = allocator;
     to_init->elem_metadata = elem_metadata;
     to_init->root = NULL;
+    return COL_RESULT_SUCCESS;
 }
 
 enum col_result
@@ -102,7 +105,8 @@ col_rb_tree_copy(
     assert(src);
     dest->allocator = src->allocator;
     dest->elem_metadata = src->elem_metadata;
-    dest->root = node_copy(src->allocator, src->elem_metadata, src->root);
+    if((dest->root = node_copy(src->allocator, src->elem_metadata, src->root)) == (void *)1) return COL_RESULT_ALLOC_FAILED;
+    return COL_RESULT_SUCCESS;
 }
 
 void
@@ -250,7 +254,7 @@ static void node_clear(struct col_allocator *allocator, struct col_elem_metadata
     if(!to_clear) return;
     node_clear(allocator, md, LEFT_CHILD(to_clear));
     node_clear(allocator, md, RIGHT_CHILD(to_clear));
-    col_elem_clr(allocator, md, node_data(to_clear));
+    col_elem_clr(md, node_data(to_clear));
     col_allocator_free(allocator, to_clear);
 }
 
@@ -258,16 +262,20 @@ static struct col_rb_tree_node *node_copy(struct col_allocator *allocator, struc
 {
     if(!to_copy) return NULL;
     struct col_rb_tree_node *result = col_allocator_malloc(allocator, sizeof(struct col_rb_tree_node) + md->elem_size);
-    if(!result) return NULL;
-    if(!col_elem_cp(allocator, md, result + 1, to_copy + 1))
-    {
-        col_allocator_free(allocator, result);
-        return NULL;
-    }
-    LEFT_CHILD(result) = node_copy(allocator, md, LEFT_CHILD(to_copy));
-    RIGHT_CHILD(result) = node_copy(allocator, md, RIGHT_CHILD(to_copy));
+    if(!result) goto fail_on_alloc;
+    if(!col_elem_cp(md, result + 1, to_copy + 1)) goto fail_on_elem_cp;
+    if((LEFT_CHILD(result) = node_copy(allocator, md, LEFT_CHILD(to_copy))) == (void *)1) goto fail_on_left;
+    if((RIGHT_CHILD(result) = node_copy(allocator, md, RIGHT_CHILD(to_copy))) == (void *)1) goto fail_on_right;
     result->color = to_copy->color;
     return result;
+fail_on_right:
+    node_clear(allocator, md, LEFT_CHILD(result));
+fail_on_left:
+    col_elem_clr(md, result + 1);
+fail_on_elem_cp:
+    col_allocator_free(allocator, result);
+fail_on_alloc:
+    return (void *)1;
 }
 
 static enum node_color node_color(struct col_rb_tree_node *node)
@@ -322,8 +330,14 @@ static void *node_data(struct col_rb_tree_node *node)
 static void handle_red_violation(struct col_rb_tree *tree, struct col_rb_tree_node *node)
 {
     // node is red and node->parent is red
-    while(node_color(node->parent) == NC_RED)
+    while(true)
     {
+        if(!(node->parent))
+        {
+            node->color = NC_BLACK;
+            return;
+        }
+        else if(node->parent->color == NC_BLACK) return;
         // Note: Grandparent exists since parent is red and the root cannot be red.
         if(node_color(uncle(node)) == NC_RED)
         {
@@ -452,7 +466,7 @@ static void handle_black_violation(struct col_rb_tree *tree, struct col_rb_tree_
                         if(node_color(LEFT_CHILD(sibling)) == NC_RED) rotate_from_ll(parent_accessor);
                         else rotate_from_lr(parent_accessor);
                     }
-                    parent = *accessor;
+                    parent = *parent_accessor;
                     parent->color = NC_BLACK;
                     LEFT_CHILD(parent)->color = NC_BLACK;
                     RIGHT_CHILD(parent)->color = NC_BLACK;
