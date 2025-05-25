@@ -36,7 +36,7 @@ struct col_rb_tree_node
 static void node_clear(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_clear);
 static struct col_rb_tree_node *node_copy(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_copy);
 static enum node_color node_color(struct col_rb_tree_node *node);
-static void *node_data(struct col_rb_tree_node *node);
+static void *node_data(struct col_rb_tree_node *node, struct col_elem_metadata *md);
 
 static void handle_red_violation(struct col_rb_tree *tree, struct col_rb_tree_node *node);
 static void handle_black_violation(struct col_rb_tree *tree, struct col_rb_tree_node *parent, enum node_dir violator_pos);
@@ -125,17 +125,21 @@ col_rb_tree_insert(
 {
     assert(self);
     assert(to_insert);
-    struct col_rb_tree_node *node_to_insert = col_allocator_malloc(self->allocator, sizeof(struct col_rb_tree_node) + self->elem_metadata->elem_size);
+    size_t size_to_allocate = sizeof(struct col_rb_tree_node);
+    size_t remainder = size_to_allocate & (self->elem_metadata->alignment - 1);
+    if(remainder) size_to_allocate += self->elem_metadata->alignment - remainder;
+    size_to_allocate += self->elem_metadata->size;
+    struct col_rb_tree_node *node_to_insert = col_allocator_malloc(self->allocator, size_to_allocate);
     if(!node_to_insert) return COL_RESULT_ALLOC_FAILED;
     memset(node_to_insert->children, 0x00, sizeof(node_to_insert->children));
     node_to_insert->color = NC_RED;
-    memcpy(node_data(node_to_insert), to_insert, self->elem_metadata->elem_size);
+    memcpy(node_data(node_to_insert, self->elem_metadata), to_insert, self->elem_metadata->size);
     struct col_rb_tree_node *parent = NULL;
     struct col_rb_tree_node **insertion_point = &(self->root);
     while(*insertion_point)
     {
         // a node already occupies the insertion point, keep descending.
-        if(col_elem_cmp(self->elem_metadata, node_data(*insertion_point), node_data(node_to_insert)) > 0)
+        if(col_elem_cmp(self->elem_metadata, node_data(*insertion_point, self->elem_metadata), node_data(node_to_insert, self->elem_metadata)) > 0)
         {
             // current > to_insert
             parent = *insertion_point;
@@ -165,7 +169,7 @@ col_rb_tree_search(
     struct col_rb_tree_node *cur = self->root;
     while(cur)
     {
-        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(cur), elem_to_search);
+        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(cur, self->elem_metadata), elem_to_search);
         if(cmp_res < 0)
         {
             cur = RIGHT_CHILD(cur);
@@ -180,7 +184,7 @@ col_rb_tree_search(
         }
     }
     if(!cur) return COL_RESULT_ELEM_NOT_FOUND;
-    *found_elem = node_data(cur);
+    *found_elem = node_data(cur, self->elem_metadata);
     return COL_RESULT_SUCCESS;
 }
 
@@ -195,7 +199,7 @@ col_rb_tree_remove(
     struct col_rb_tree_node **removal_point = &(self->root);
     while(*removal_point)
     {
-        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(*removal_point), elem_to_remove);
+        int cmp_res = col_elem_cmp(self->elem_metadata, node_data(*removal_point, self->elem_metadata), elem_to_remove);
         if(cmp_res < 0)
         {
             cur_pos = ND_RIGHT;
@@ -212,7 +216,7 @@ col_rb_tree_remove(
         }
     }
     if(!(*removal_point)) return COL_RESULT_ELEM_NOT_FOUND;
-    memcpy(removed_elem, node_data(*removal_point), self->elem_metadata->elem_size);
+    memcpy(removed_elem, node_data(*removal_point, self->elem_metadata), self->elem_metadata->size);
     if(LEFT_CHILD(*removal_point) && RIGHT_CHILD(*removal_point))
     {
         struct col_rb_tree_node **succ_ptr = &RIGHT_CHILD(*removal_point);
@@ -222,7 +226,7 @@ col_rb_tree_remove(
             succ_ptr = &LEFT_CHILD(*succ_ptr);
             cur_pos = ND_LEFT;
         }
-        memcpy(node_data(*removal_point), node_data(*succ_ptr), self->elem_metadata->elem_size);
+        memcpy(node_data(*removal_point, self->elem_metadata), node_data(*succ_ptr, self->elem_metadata), self->elem_metadata->size);
         removal_point = succ_ptr;
     }
     // We want the above case where we replace with successor to fall-through so that a node is eventually removed.
@@ -254,14 +258,18 @@ static void node_clear(struct col_allocator *allocator, struct col_elem_metadata
     if(!to_clear) return;
     node_clear(allocator, md, LEFT_CHILD(to_clear));
     node_clear(allocator, md, RIGHT_CHILD(to_clear));
-    col_elem_clr(md, node_data(to_clear));
+    col_elem_clr(md, node_data(to_clear, md));
     col_allocator_free(allocator, to_clear);
 }
 
 static struct col_rb_tree_node *node_copy(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_copy)
 {
     if(!to_copy) return NULL;
-    struct col_rb_tree_node *result = col_allocator_malloc(allocator, sizeof(struct col_rb_tree_node) + md->elem_size);
+    size_t size_to_allocate = sizeof(struct col_rb_tree_node);
+    size_t remainder = size_to_allocate & (md->alignment - 1);
+    if(remainder) size_to_allocate += md->alignment - remainder;
+    size_to_allocate += md->size;
+    struct col_rb_tree_node *result = col_allocator_malloc(allocator, size_to_allocate);
     if(!result) goto fail_on_alloc;
     if(!col_elem_cp(md, result + 1, to_copy + 1)) goto fail_on_elem_cp;
     if((LEFT_CHILD(result) = node_copy(allocator, md, LEFT_CHILD(to_copy))) == (void *)1) goto fail_on_left;
@@ -321,10 +329,13 @@ static void rotate_from_rl(struct col_rb_tree_node **accessor)
     rotate(accessor, ND_RIGHT);
 }
 
-static void *node_data(struct col_rb_tree_node *node)
+static void *node_data(struct col_rb_tree_node *node, struct col_elem_metadata *md)
 {
     assert(node);
-    return (void *)(node + 1);
+    size_t offset = sizeof(struct col_rb_tree_node);
+    size_t remainder = offset & (md->alignment - 1);
+    if(remainder) offset += md->alignment - remainder;
+    return (void *)(((uint8_t *)(node)) + offset);
 }
 
 static void handle_red_violation(struct col_rb_tree *tree, struct col_rb_tree_node *node)
@@ -390,7 +401,6 @@ static void handle_black_violation(struct col_rb_tree *tree, struct col_rb_tree_
 {
     while(parent)
     {
-        // struct col_rb_tree_node **parent_accessor = accessor(tree, parent);
         struct col_rb_tree_node *sibling = (violator_pos == ND_LEFT) ? RIGHT_CHILD(parent) : LEFT_CHILD(parent);
         if(node_color(parent) == NC_RED)
         {
@@ -429,16 +439,8 @@ static void handle_black_violation(struct col_rb_tree *tree, struct col_rb_tree_
                 parent->color = NC_RED;
                 sibling->color = NC_BLACK;
                 struct col_rb_tree_node **parent_accessor = accessor(tree, parent);
-                if(violator_pos == ND_LEFT)
-                {
-                    rotate_from_rr(parent_accessor);
-                    parent = LEFT_CHILD(*parent_accessor);
-                }
-                else // violator_pos == ND_RIGHT
-                {
-                    rotate_from_ll(parent_accessor);
-                    parent = RIGHT_CHILD(*parent_accessor);
-                }
+                if(violator_pos == ND_LEFT) rotate_from_rr(parent_accessor);
+                else rotate_from_ll(parent_accessor);
                 // This moves the redness in sibling to be the parent of the violator so that case 1 above can run next 
                 // iteration and terminate.
             }

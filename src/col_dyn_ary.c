@@ -20,7 +20,7 @@ enum col_result col_dyn_ary_init(struct col_dyn_ary *to_init, struct col_allocat
     to_init->elem_metadata = elem_metadata;
     if(initial_cap > 0)
     {
-        to_init->data = col_allocator_malloc(allocator, elem_metadata->elem_size * initial_cap);
+        to_init->data = col_allocator_malloc(allocator, elem_metadata->size * initial_cap);
         if(!to_init->data) return COL_RESULT_ALLOC_FAILED;
     }
     else
@@ -44,7 +44,7 @@ enum col_result col_dyn_ary_copy(struct col_dyn_ary *dest, struct col_dyn_ary *s
     dest->growth_factor = src->growth_factor;
     if(src->cap > 0)
     {
-        dest->data = col_allocator_malloc(src->allocator, src->elem_metadata->elem_size * src->cap);
+        dest->data = col_allocator_malloc(src->allocator, src->elem_metadata->size * src->cap);
         if(!dest->data) return COL_RESULT_ALLOC_FAILED;
     }
     else
@@ -76,15 +76,15 @@ enum col_result col_dyn_ary_insert_at(struct col_dyn_ary *dyn_ary, void *to_inse
     for(size_t i = dyn_ary->len; i > index; i--)
     {
         memcpy(
-            dyn_ary->data + dyn_ary->elem_metadata->elem_size * i,
-            dyn_ary->data + dyn_ary->elem_metadata->elem_size * (i - 1),
-            dyn_ary->elem_metadata->elem_size
+            dyn_ary->data + dyn_ary->elem_metadata->size * i,
+            dyn_ary->data + dyn_ary->elem_metadata->size * (i - 1),
+            dyn_ary->elem_metadata->size
         );
     }
     memcpy(
-        dyn_ary->data + dyn_ary->elem_metadata->elem_size * index,
+        dyn_ary->data + dyn_ary->elem_metadata->size * index,
         to_insert,
-        dyn_ary->elem_metadata->elem_size
+        dyn_ary->elem_metadata->size
     );
     dyn_ary->len++;
     return COL_RESULT_SUCCESS;
@@ -98,7 +98,7 @@ enum col_result col_dyn_ary_push_back(struct col_dyn_ary *dyn_ary, void *to_inse
 void *col_dyn_ary_get(struct col_dyn_ary const *dyn_ary, size_t idx)
 {
     if(idx >= dyn_ary->len) return NULL;
-    return dyn_ary->data + dyn_ary->elem_metadata->elem_size * idx;
+    return dyn_ary->data + dyn_ary->elem_metadata->size * idx;
 }
 
 enum col_result col_dyn_ary_rm(struct col_dyn_ary *dyn_ary, size_t idx, void *removed_elem)
@@ -106,15 +106,15 @@ enum col_result col_dyn_ary_rm(struct col_dyn_ary *dyn_ary, size_t idx, void *re
     if(idx >= dyn_ary->len) return COL_RESULT_IDX_OOB;
     memcpy(
         removed_elem,
-        dyn_ary->data + dyn_ary->elem_metadata->elem_size * idx,
-        dyn_ary->elem_metadata->elem_size
+        dyn_ary->data + dyn_ary->elem_metadata->size * idx,
+        dyn_ary->elem_metadata->size
     );
     for(size_t i = idx; i + 1 < dyn_ary->len; i++)
     {
         memcpy(
-            dyn_ary->data + dyn_ary->elem_metadata->elem_size * i,
-            dyn_ary->data + dyn_ary->elem_metadata->elem_size * (i + 1),
-            dyn_ary->elem_metadata->elem_size
+            dyn_ary->data + dyn_ary->elem_metadata->size * i,
+            dyn_ary->data + dyn_ary->elem_metadata->size * (i + 1),
+            dyn_ary->elem_metadata->size
         );
     }
     dyn_ary->len--;
@@ -130,7 +130,7 @@ enum col_result col_dyn_ary_lin_search(struct col_dyn_ary *dyn_ary, void *elem, 
 {
     for(size_t i = 0; i < dyn_ary->len; i++)
     {
-        if(col_elem_eq(dyn_ary->elem_metadata, elem, dyn_ary->data + dyn_ary->elem_metadata->elem_size * i))
+        if(col_elem_eq(dyn_ary->elem_metadata, elem, dyn_ary->data + dyn_ary->elem_metadata->size * i))
         {
             *idx_if_found = i;
             return COL_RESULT_SUCCESS;
@@ -150,7 +150,7 @@ enum col_result col_dyn_ary_bin_search(struct col_dyn_ary *dyn_ary, void *elem, 
         int cmp_res = col_elem_cmp(
             dyn_ary->elem_metadata,
             elem,
-            dyn_ary->data + dyn_ary->elem_metadata->elem_size * mid
+            dyn_ary->data + dyn_ary->elem_metadata->size * mid
         );
         if(cmp_res < 0)
         {
@@ -174,10 +174,10 @@ enum col_result col_dyn_ary_trim(struct col_dyn_ary *dyn_ary)
 {
     uint8_t *new_buf = col_allocator_malloc(
         dyn_ary->allocator,
-        dyn_ary->len * dyn_ary->elem_metadata->elem_size
+        dyn_ary->len * dyn_ary->elem_metadata->size
     );
     if(!new_buf) return COL_RESULT_ALLOC_FAILED;
-    memcpy(new_buf, dyn_ary->data, dyn_ary->len * dyn_ary->elem_metadata->elem_size);
+    memcpy(new_buf, dyn_ary->data, dyn_ary->len * dyn_ary->elem_metadata->size);
     col_allocator_free(dyn_ary->allocator, dyn_ary->data);
     dyn_ary->data = new_buf;
     dyn_ary->cap = dyn_ary->len;
@@ -189,13 +189,13 @@ enum col_result col_dyn_ary_cat(struct col_dyn_ary *first, struct col_dyn_ary *s
     if(first->cap < first->len + second->len)
     {
         // grow if needed
-        uint8_t *new_buf = col_allocator_malloc(first->allocator, first->elem_metadata->elem_size * (first->cap + second->cap));
+        uint8_t *new_buf = col_allocator_malloc(first->allocator, first->elem_metadata->size * (first->cap + second->cap));
         if(!new_buf) return COL_RESULT_ALLOC_FAILED;
-        memcpy(new_buf, first->data, first->elem_metadata->elem_size * first->len);
+        memcpy(new_buf, first->data, first->elem_metadata->size * first->len);
         col_allocator_free(first->allocator, first->data);
         first->data = new_buf;
     }
-    memcpy(first->data + first->len * first->elem_metadata->elem_size, second->data, second->len * second->elem_metadata->elem_size);
+    memcpy(first->data + first->len * first->elem_metadata->size, second->data, second->len * second->elem_metadata->size);
     col_allocator_free(second->allocator, second->data);
     first->len += second->len;
     first->cap += second->cap;
@@ -211,9 +211,9 @@ static enum col_result expand(struct col_dyn_ary *dyn_ary)
 {
     size_t new_cap = (size_t)((float)(dyn_ary->cap) * dyn_ary->growth_factor);
     if(new_cap == dyn_ary->cap) new_cap++;
-    uint8_t *new_buf = col_allocator_malloc(dyn_ary->allocator, dyn_ary->elem_metadata->elem_size * new_cap);
+    uint8_t *new_buf = col_allocator_malloc(dyn_ary->allocator, dyn_ary->elem_metadata->size * new_cap);
     if(!new_buf) return COL_RESULT_ALLOC_FAILED;
-    memcpy(new_buf, dyn_ary->data, dyn_ary->len * dyn_ary->elem_metadata->elem_size);
+    memcpy(new_buf, dyn_ary->data, dyn_ary->len * dyn_ary->elem_metadata->size);
     col_allocator_free(dyn_ary->allocator, dyn_ary->data);
     dyn_ary->data = new_buf;
     dyn_ary->cap = new_cap;

@@ -94,7 +94,7 @@ static void clear_node(struct col_allocator *allocator, struct col_elem_metadata
 static struct col_avl_tree_node *copy_node(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_avl_tree_node *to_copy)
 {
     if(!to_copy) return NULL;
-    struct col_avl_tree_node *result = col_allocator_malloc(allocator, sizeof(struct col_avl_tree_node) + md->elem_size);
+    struct col_avl_tree_node *result = col_allocator_malloc(allocator, sizeof(struct col_avl_tree_node) + md->size);
     if(!result) return NULL;
     if(!col_elem_cp(allocator, md, result + 1, to_copy + 1))
     {
@@ -126,7 +126,7 @@ static struct insert_node_result insert_node(struct col_allocator *allocator, st
     struct insert_node_result result;
     if(!insertion_point)
     {
-        struct col_avl_tree_node *new_node = col_allocator_malloc(allocator, sizeof(struct col_avl_tree_node) + md->elem_size);
+        struct col_avl_tree_node *new_node = col_allocator_malloc(allocator, sizeof(struct col_avl_tree_node) + md->size);
         if(!new_node)
         {
             result.result = COL_RESULT_ALLOC_FAILED;
@@ -136,7 +136,7 @@ static struct insert_node_result insert_node(struct col_allocator *allocator, st
         new_node->data = new_node + 1;
         new_node->left = NULL;
         new_node->right = NULL;
-        memcpy(new_node + 1, to_insert, md->elem_size);
+        memcpy(new_node + 1, to_insert, md->size);
 
         result.result = COL_RESULT_SUCCESS;
         result.depth = 1;

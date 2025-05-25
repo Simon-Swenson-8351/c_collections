@@ -6,7 +6,7 @@
 bool col_elem_cp(struct col_elem_metadata *md, void *dest, void *src)
 {
     if(md->cp_fn) return md->cp_fn(dest, src);
-    memcpy(dest, src, md->elem_size);
+    memcpy(dest, src, md->size);
     return true;
 }
 
@@ -14,12 +14,12 @@ bool col_elem_cp_many(struct col_elem_metadata *md, void *dest, void *src, size_
 {
     if(!md->cp_fn)
     {
-        memcpy(dest, src, md->elem_size * count);
+        memcpy(dest, src, md->size * count);
         return true;
     }
     for(size_t i = 0; i < count; i++)
     {
-        if(!md->cp_fn((uint8_t *)(dest) + md->elem_size * i, (uint8_t *)(src) + md->elem_size * i))
+        if(!md->cp_fn((uint8_t *)(dest) + md->size * i, (uint8_t *)(src) + md->size * i))
         {
             col_elem_clr_many(md, dest, i);
             return false;
@@ -43,11 +43,11 @@ bool col_elem_eq(struct col_elem_metadata *md, void *a, void *b)
 {
     if(md->eq_fn) return md->eq_fn(a, b);
     if(md->cmp_fn) return md->cmp_fn(a, b) == 0;
-    return memcmp(a, b, md->elem_size) == 0;
+    return memcmp(a, b, md->size) == 0;
 }
 
 int col_elem_cmp(struct col_elem_metadata *md, void *a, void *b)
 {
     if(md->cmp_fn) return md->cmp_fn(a, b);
-    return memcmp(a, b, md->elem_size);
+    return memcmp(a, b, md->size);
 }

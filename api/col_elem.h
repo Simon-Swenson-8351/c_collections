@@ -1,37 +1,38 @@
 #pragma once
 
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
 
 struct col_allocator;
 
 /**
- * Copies an element from src to dest
+ * @brief copies an element from src to dest
  * @pre allocator is optional
  * @pre dest points to a buffer large enough to store an element of the type for which this function is written
  * @pre src points to a valid instance of an element of the type for which this function is written
  */
-typedef bool (*col_elem_cp_fn)(void *dest, void *src);
+typedef bool (*col_elem_copy_fn)(void *dest, void *src);
 
 /**
- * Clears the given element
+ * @brief clears the given element
  * @pre allocator is optional
  * @pre to_clear points to a valid instance of an element of the type for which this function is written
  */
-typedef void (*col_elem_clr_fn)(void *to_clear);
+typedef void (*col_elem_clear_fn)(void *to_clear);
 
 /**
- * Determines whether two elements are equal
+ * @brief determines whether two elements are equal
  * @pre a, b point to valid instances of elements of the type for which this function is written
  */
-typedef bool (*col_elem_eq_fn)(void *a, void *b);
+typedef bool (*col_elem_equals_fn)(void *a, void *b);
 
 /**
- * Compares two elements
+ * @brief compares two elements
  * @pre a, b point to valid instances of elements of the type for which this function is written
  * @return -1 if a < b, 0 if a == b, 1 if a > b
  */
-typedef int (*col_elem_cmp_fn)(void *a, void *b);
+typedef int (*col_elem_compare_fn)(void *a, void *b);
 
 /**
  * Functions and data used by collections for their internal operations
@@ -42,11 +43,12 @@ typedef int (*col_elem_cmp_fn)(void *a, void *b);
  */
 struct col_elem_metadata
 {
-    col_elem_cp_fn  cp_fn;     ///< optional, if not present, will use memcpy on copy
-    col_elem_clr_fn clr_fn;    ///< optional, if not present, will do nothing on clear
-    col_elem_eq_fn  eq_fn;     ///< optional, if not present, will use memcmp
-    col_elem_cmp_fn cmp_fn;    ///< optional, if not present, will use memcmp
-    size_t          elem_size; ///< required, must be > 0
+    col_elem_copy_fn    cp_fn;     ///< optional, if not present, will use memcpy on copy
+    col_elem_clear_fn   clr_fn;    ///< optional, if not present, will do nothing on clear
+    col_elem_equals_fn  eq_fn;     ///< optional, if not present, will use memcmp
+    col_elem_compare_fn cmp_fn;    ///< optional, if not present, will use memcmp
+    size_t              size;      ///< required, must be > 0
+    size_t              alignment; ///< required, must be > 0
 };
 
 /**
