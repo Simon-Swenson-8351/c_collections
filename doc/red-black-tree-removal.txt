@@ -1,0 +1,82 @@
+Precondition: A child, "c1," of the current node, "node," is instigating a black violation and needs an additional 
+black node in its path to satisfy the black depth condition. Note that c1 could be just removed, null. Call the other 
+child "c2."
+Corollary: c2 is not null, since it had the same black depth as c1, and c1 was at minimum an existing black node.
+Case 1: cur is red
+    Corollary: c2 is black
+    Call "gc1" the child of c2 that is closer to c1 and "gc2" the other child of c2.
+    Case 1.1: gc1, gc2 are black
+        Note: Move the black up from c2.
+        cur.color <- black
+        c2.color <- red
+        This satisfies the black violation, and the algorithm can end.
+
+        Visualization:
+
+               cur,R                    cur,B
+              /     \                  /     \
+            c1       c2,B        ->  c1       c2,R
+                    /    \                   /    \
+               gc1,B      gc2,B         gc1,B      gc2,B
+
+    Case 1.2: Either gc1 or gc2 is red, call it gcr.
+        cur.color <- black
+        Perform a 3-rotation on cur, c2, and gcr.
+        This satisfies the black violation, and the algorithm can end.
+
+        Visualization:
+
+                   cur,R                            gcr,R
+                  /     \                        /         \
+                c1       c2,B        ->    cur,B             c2,B
+                        /    \            /     \           /    \
+                   gcr,R      gc2,B      +       ggc1,B  ggc2,B   gc2,B
+                  /     \
+            ggc1,B       ggc2,B
+
+        Node: Nodes D,E,F above have the same black depth as +.
+
+Case 2: cur is black
+    Case 2.1: c2 is red
+        Corollary: gc1, gc2 are black
+        Corollary: gc1, gc2 are not null, since c1 existed at least before the removal.
+        Perform a rotation in the c1 direction between cur, c2.
+
+        Visualization:
+
+               cur,B                          c2,B
+              /     \                        /    \
+            c1       c2,R        ->     cur,B      gc2,B
+                    /    \             /     \
+               gc1,B      gc2,B      c1       gc1,B
+
+        At this point, the path from the top of this sub-tree to gc1 has one too many black nodes, and gc1 must be 
+        corrected. Call child_needs_red(cur, gc1).
+        This satisfies the black violation, and the algorithm can end.
+    Case 2.2: c2 is black
+        Case 2.2.1: gc1, gc2 are black
+            c2.color <- red
+            This action propagates the black violation from c1 to cur, so we must repeat the process with cur.parent 
+            next.
+        Case 2.2.2: gc1 or gc2 is red
+            Call it gcr. Perform a 3-rotation on cur, c2, gcr. Make all three nodes black.
+
+            Visualization:
+
+                       cur,B                            gcr,B
+                      /     \                        /         \
+                    c1       c2,B        ->    cur,B             c2,B
+                            /    \            /     \           /    \
+                       gcr,R      gc2,B      +       ggc1,B  ggc2,B   gc2,B
+                      /     \
+                ggc1,B       ggc2,B
+
+            This satisfies the black violation.
+
+child_needs_red(cur, c2):
+    Precondition: cur, c2 are black and not null.
+    Call the grandchildren of c2 "gc1" and "gc2."
+    Case 1: gc1 and gc2 are black
+        c2.color <- red
+    Case 2: either gc1 or gc2 is red, call it gcr
+        Perform the rotation from Case 1.2 cur, c2, gcr
