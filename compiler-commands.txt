@@ -1,0 +1,1 @@
+gcc -Iapi -Iinc -Isrc -Itest -Wall -Wextra -Wpedantic -fsanitize=address -g test/test_col_rb_tree.c

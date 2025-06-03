@@ -54,18 +54,3 @@ col_rb_tree_remove(
     void *elem_to_remove,
     void *removed_elem
 );
-
-enum col_result
-col_rb_tree_for_each(
-    struct col_rb_tree *self,
-    void *closure_context,
-    bool(*closure)(void *context, void *elem)
-);
-
-// first will contain all elements
-// second will be cleared
-enum col_result
-col_rb_tree_merge(
-    struct col_rb_tree *first,
-    struct col_rb_tree *second
-);
