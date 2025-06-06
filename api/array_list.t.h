@@ -6,45 +6,224 @@
 
 #include "col_result.h"
 
-#ifndef TEMPL_DATA_TYPE
-#error "Template requires TEMPL_DATA_TYPE"
+#ifndef COLN_DATA_TYPE
+#error "Collection macros require COLN_DATA_TYPE"
 #endif
 
-#ifndef TEMPL_COL_TYPE
-#error "Template requires TEMPL_COL_TYPE"
+#ifndef COLN_DATA_COPY
+#define COLN_DATA_COPY(dest_ptr, src_ptr) *dest_ptr = *src_ptr, true
+#define COLN_DATA_COPY_MANY(dest_ptr, src_ptr, count) memcpy(dest_ptr, src_ptr, sizeof(COLN_DATA_TYPE) * (count)), true
 #endif
 
-#ifndef TEMPL_ERR_HANDLING_TYPE
-#error "Template requires TEMPL_ERR_HANDLING_TYPE"
-#endif
-
-#if defined(TEMPL_ALLOC_TYPE)
-#define ARY_LIST_STRUCT_DEFN \
-typedef struct TEMPL_COL_TYPE \
-{ \
-    TEMPL_ALLOC_TYPE *alloc; \
-    TEMPL_DATA_TYPE *data; \
-    size_t len; \
-    size_t cap; \
-} TEMPL_COL_TYPE;
+#ifndef COLN_DATA_COPY_MANY
+#define COLN_DATA_COPY_MANY COLN_DATA_TYPE ## _colnhelper_copy_many
+#define COLN_DATA_COPY_MANY_DECL static bool COLN_DATA_COPY_MANY(COLN_DATA_TYPE *dest, COLN_DATA_TYPE *src, size_t count)
+#define COLN_DATA_COPY_MANY_DEFN \
+    COLN_DATA_COPY_MANY_DECL \
+    { \
+        for(ptrdiff_t i = 0; i < count; i++) \
+        { \
+            if(!COLN_DATA_COPY(dest + i, src + i)) \
+            { \
+                for(ptrdiff_t j = i - 1; j >= 0; j--) \
+                { \
+                    COLN_DATA_CLEAR(dest + j); \
+                } \
+                return false; \
+            } \
+        } \
+        return true; \
+    }
 #else
+#define COLN_DATA_COPY_MANY_DECL
+#define COLN_DATA_COPY_MANY_DEFN
+#endif
+
+#ifndef COLN_DATA_MOVE
+#define COLN_DATA_MOVE(dest_ptr, src_ptr) *dest_ptr = *src_ptr
+#define COLN_DATA_MOVE_MANY(dest_ptr, src_ptr, count) memcpy(dest_ptr, src_ptr, sizeof(COLN_DATA_TYPE) * (count))
+#endif
+
+#ifdef COLN_DATA_MOVE_MANY
+#define COLN_DATA_MOVE_MANY(dest_ptr, src_ptr, count) \
+    do \
+    { \
+        for(ptrdiff_t i = 0; i < (count); i++) \
+        { \
+            COLN_DATA_MOVE((dest_ptr) + i, (src_ptr) + i); \
+        } \
+    } while(0)
+#endif
+
+#ifndef COLN_DATA_CLEAR
+#define COLN_DATA_CLEAR(to_clear_ptr)
+#define COLN_DATA_CLEAR_MANY(to_clear_ptr, count)
+#endif
+
+#ifndef COLN_DATA_CLEAR_MANY
+#define COLN_DATA_CLEAR_MANY(to_clear, count)
+    do \
+    { \
+        for(ptrdiff_t i = 0; i < count; i++) \
+        { \
+            COLN_DATA_CLEAR((to_clear) + i); \
+        } \
+    } while(0)
+#endif
+
+#ifndef COLN_TYPE
+#error "Collection macros require COLN_TYPE"
+#endif
+
+#ifndef COLN_ERR_HANDLING_TYPE
+#define COLN_ERR_HANDLING_TYPE COLN_EHT_RET
+#endif
+
+#if COLN_ERR_HANDLING_TYPE == COLN_EHT_RET
+#define COLN_CHECK(expr, return_result) \
+    do \
+    { \
+        if(expr) \
+        { \
+            return return_result; \
+        } \
+    } while(0)
+#define COLN_CHECK_CLEANUP(expr, return_result, cleanup_jump_label) \
+    do \
+    { \
+        if(expr) \
+        { \
+            result = return_result; \
+            goto cleanup_jump_label; \
+        } \
+    } while(0)
+#define COLN_CHECK_EVAL COLN_CHECK
+#define COLN_RETURN_TYPE coln_result
+#define COLN_RETURN_VAR_DECL coln_result result
+#define COLN_RETURN_VAR_ASSIGN(x) result = x
+#define COLN_RETURN_STMT(x) return x
+#elif COLN_ERR_HANDLING_TYPE == COLN_EHT_EXIT
+#define COLN_CHECK(expr, return_result) \
+    do { \
+        if(expr) \
+        { \
+            fprintf(stderr, #expr "\n"); \
+            exit(1); \
+        } \
+    } while(0)
+#define COLN_CHECK_CLEANUP(expr, return_result, cleanup_jump_label) \
+    do { \
+        if(expr) \
+        { \
+            fprintf(stderr, #expr "\n"); \
+            exit(1); \
+        } \
+    } while(0)
+#define COLN_CHECK_EVAL COLN_CHECK
+#define COLN_RETURN_TYPE void
+#define COLN_RETURN_VAR_DECL
+#define COLN_RETURN_VAR_ASSIGN(x) x
+#define COLN_RETURN_STMT(x) return
+#elif COLN_ERR_HANDLING_TYPE == COLN_EHT_NO_CHECK
+#define COLN_CHECK(expr, return_result)
+#define COLN_CHECK_CLEANUP(expr, return_result, cleanup_jump_label)
+#define COLN_CHECK_EVAL(expr, return_result, cleanup_jump_label) expr
+#define COLN_RETURN_TYPE void
+#define COLN_RETURN_VAR_DECL
+#define COLN_RETURN_VAR_ASSIGN(x) x
+#define COLN_RETURN_STMT(x) return
+#else
+#error "Collection macros were given an unknown COLN_ERR_HANDLING_TYPE"
+#endif
+
+#ifdef COLN_ALLOC_TYPE
+#define COLN_ALLOC_DECL COLN_ALLOC_TYPE *allocator;
+#define COLN_ALLOC_ARG COLN_ALLOC_TYPE *allocator,
+#define COLN_ALLOC_ASSIGN(self) self->allocator = allocator
+#define COLN_ALLOC_REASSIGN(self, other) self->allocator = other->allocator
+#ifndef COLN_ALLOC
+#error "Collection macros require an allocation function if an allocator type is defined."
+#endif
+#ifndef COLN_FREE
+#define COLN_FREE(allocator, ptr_to_free)
+#endif
+#else
+#define COLN_ALLOC_DECL
+#define COLN_ALLOC_ARG
+#define COLN_ALLOC_ASSIGN(self)
+#define COLN_ALLOC_REASSIGN(self, other)
+#define COLN_ALLOC(allocator, size_to_alloc) malloc(size_to_alloc)
+#define COLN_FREE(allocator, ptr_to_free) free(ptr_to_free)
+#endif
+
 #define ARY_LIST_STRUCT_DEFN \
-typedef struct TEMPL_COL_TYPE \
-{ \
-    TEMPL_DATA_TYPE *data; \
-    size_t len; \
-    size_t cap; \
-} TEMPL_COL_TYPE;
-#endif
+    typedef struct COLN_TYPE \
+    { \
+        COLN_ALLOC_DECL \
+        COLN_DATA_TYPE *data; \
+        size_t len; \
+        size_t cap; \
+    } COLN_TYPE;
 
-#if defined(TEMPL_ERR_HANDLING_TYPE) && TEMPL_ERR_HANDLING_TYPE == TEMPL_ERR_HANDLING_TYPE_ERR_CODE
-#define ARY_LIST_INIT_DECL \
-    enum col_result TEMPL_COL_TYPE ## _init(TEMPL_COL_TYPE *to_init,
-                                            )
-#else 
-#endif
+#define ARRAY_LIST_INIT_DECL \
+    COLN_RETURN_TYPE COLN_TYPE ## _init(COLN_TYPE *to_init, \
+                                        COLN_ALLOC_ARG
+                                        unsigned int initial_cap_exp)
+#define ARRAY_LIST_INIT_DEFN \
+    ARRAY_LIST_INIT_DECL \
+    { \
+        COLN_CHECK(!to_init, COLN_RESULT_BAD_ARG); \
+        COLN_CHECK(!allocator, COLN_RESULT_BAD_ARG); \
+        COLN_ALLOC_ASSIGN(to_init); \
+        to_init->cap = 1 << initial_cap_exp;
+        to_init->data = COLN_ALLOC( \
+            allocator, \
+            sizeof(COLN_DATA_TYPE) * to_init->cap); \
+        COLN_CHECK(!to_init->data, COLN_RESULT_ALLOC_FAILED, end); \
+        to_init->len = 0;
+        COLN_RETURN_STMT(COLN_RESULT_SUCCESS);
+    }
 
-#define TEMPL_COL_H \
+#define ARRAY_LIST_COPY_DECL \
+    COLN_RETURN_TYPE COLN_TYPE ## _copy(COLN_TYPE *dest, COLN_TYPE *src)
+#define ARRAY_LIST_COPY_DEFN \
+    ARRAY_LIST_COPY_DECL \
+    { \
+        COLN_CHECK(!dest, COLN_RESULT_BAD_ARG); \
+        COLN_CHECK(!src, COLN_RESULT_BAD_ARG); \
+        COLN_ALLOC_REASSIGN(dest, src); \
+        dest->len = src->len; \
+        dest->cap = src->cap; \
+        dest->data = COLN_ALLOC(src->allocator, \
+                                   sizeof(COLN_DATA_TYPE) * src->cap); \
+        COLN_CHECK(!dest->data, COLN_RESULT_ALLOC_FAILED); \
+        COLN_CHECK_EVAL( \
+            !COLN_DATA_COPY_MANY(dest->data, src->data, src->len), \
+            COLN_RESULT_ALLOC_FAILED); \
+        COLN_RETURN_STMT(COLN_RESULT_SUCCESS); \
+    }
+
+#define ARRAY_LIST_CLEAR_DECL \
+    void COLN_TYPE ## _clear(COLN_TYPE *to_clear)
+#define ARRAY_LIST_CLEAR_DEFN \
+    ARRAY_LIST_CLEAR_DECL \
+    { \
+        COLN_DATA_CLEAR_MANY(to_clear->data, to_clear->len); \
+        COLN_ALLOC_FREE(to_clear->data); \
+    }
+
+#define ARRAY_LIST_PUSH_BACK_DECL \
+    COLN_RETURN_TYPE COLN_TYPE ## _push_back(COLN_TYPE *self, COLN_DATA_TYPE *to_insert)
+#define ARRAY_LIST_PUSH_BACK_DEFN \
+    ARRAY_LIST_PUSH_BACK_DECL \
+    { \
+        if(self->len == self->cap) \
+        { \
+            COL_RETURN_VAR_ASSIGN(expand(self)); \
+    
+    }
+
+#define COLN_H \
     ARY_LIST_STRUCT_DEFN
 
 static enum col_result expand(struct col_dyn_ary *dyn_ary);

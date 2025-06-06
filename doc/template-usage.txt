@@ -13,9 +13,18 @@ For single-data-type templates:
 - COLN_DATA_TYPE: the data type for which this collection is created (e.g. int)
 - COLN_DATA_COPY_FN: (optional) a function with the signature:
   bool COLN_DATA_COPY_FN(COLN_DATA_TYPE *dest, COLN_DATA_TYPE *src);
-  that may be used to copy more complicated structures. If not defined, memcpy 
-  will be used internally if an object of type COLN_DATA_TYPE needs to be 
-  copied.
+  that may be used to copy more complicated structures. dest is assumed to be 
+  uninitialized or cleared. If not defined, memcpy will be used internally if 
+  an object of type COLN_DATA_TYPE needs to be copied.
+- COLN_DATA_MOVE_FN: (optional) a function with the signature:
+  void COLN_DATA_MOVE_FN(COLN_DATA_TYPE *dest, COLN_DATA_TYPE *src);
+  that may be used to move more complicated structures. dest is assumed to be 
+  uninitialized or cleared. If not defined, memcpy will be used internally if 
+  an object of type COLN_DATA_TYPE needs to be copied. In most cases, a defined 
+  move function will not be needed. However, this may be useful for types with 
+  back pointers. For example, a custom move function could be defined for a 
+  tree node with parent pointers so that it updates the parent's appropriate 
+  child pointer and each child's parent pointer.
 - COLN_DATA_CLEAR_FN: (optional) a function with the signature:
   void COLN_DATA_CLEAR_FN(COLN_DATA_TYPE *to_clear);
   that may be used to clear more complicated structures. If not defined, no 
@@ -41,11 +50,14 @@ For single-data-type templates:
 For any map:
 - COLN_KEY_TYPE: the "key" data type for which this collection is created
 - COLN_KEY_COPY_FN: (optional) function to copy a key. (See COLN_DATA_COPY_FN)
+- COLN_KEY_MOVE_FN: (optional) function to move a key. (See COLN_DATA_MOVE_FN)
 - COLN_KEY_CLEAR_FN: (optional) function to clear a key. (See 
   COLN_DATA_CLEAR_FN)
 - COLN_VALUE_TYPE: the "value" data type for which this collection is created
 - COLN_VALUE_COPY_FN: (optional) function to copy a value. (See 
   COLN_DATA_COPY_FN)
+- COLN_VALUE_MOVE_FN: (optional) function to move a value. (See 
+  COLN_DATA_MOVE_FN)
 - COLN_VALUE_CLEAR_FN: (optional) function to clear a value. (See 
   COLN_DATA_CLEAR_FN)
 For tree map:
@@ -59,6 +71,7 @@ For hash map:
   that will hash the data in COLN_KEY_TYPE. If not defined, attempts to use 
   the hash map template will emit a compilation error.
 For all collection templates:
+- COLN_TYPE: (required) the typename of the collection being generated
 - COLN_ERR_HANDLING_TYPE: (optional) designates what scheme to use for 
   handling errors when they happen. If not defined, COLN_EHT_RET will be used. 
   Available options:
