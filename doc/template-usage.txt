@@ -11,13 +11,13 @@ define requirements follow:
 
 For single-data-type templates:
 - COLN_DATA_TYPE: the data type for which this collection is created (e.g. int)
-- COLN_DATA_COPY_FN: (optional) a function with the signature:
-  bool COLN_DATA_COPY_FN(COLN_DATA_TYPE *dest, COLN_DATA_TYPE *src);
+- COLN_DATA_COPY: (optional) a function with the signature:
+  bool COLN_DATA_COPY(COLN_DATA_TYPE *dest, COLN_DATA_TYPE *src);
   that may be used to copy more complicated structures. dest is assumed to be 
   uninitialized or cleared. If not defined, memcpy will be used internally if 
   an object of type COLN_DATA_TYPE needs to be copied.
-- COLN_DATA_MOVE_FN: (optional) a function with the signature:
-  void COLN_DATA_MOVE_FN(COLN_DATA_TYPE *dest, COLN_DATA_TYPE *src);
+- COLN_DATA_MOVE: (optional) a function with the signature:
+  void COLN_DATA_MOVE(COLN_DATA_TYPE *dest, COLN_DATA_TYPE *src);
   that may be used to move more complicated structures. dest is assumed to be 
   uninitialized or cleared. If not defined, memcpy will be used internally if 
   an object of type COLN_DATA_TYPE needs to be copied. In most cases, a defined 
@@ -25,26 +25,26 @@ For single-data-type templates:
   back pointers. For example, a custom move function could be defined for a 
   tree node with parent pointers so that it updates the parent's appropriate 
   child pointer and each child's parent pointer.
-- COLN_DATA_CLEAR_FN: (optional) a function with the signature:
-  void COLN_DATA_CLEAR_FN(COLN_DATA_TYPE *to_clear);
+- COLN_DATA_CLEAR: (optional) a function with the signature:
+  void COLN_DATA_CLEAR(COLN_DATA_TYPE *to_clear);
   that may be used to clear more complicated structures. If not defined, no 
   operation will be performed when objects are cleared up.
-- COLN_DATA_EQ_FN: (optional) a function with the signature:
-  bool COLN_DATA_EQ_FN(COLN_DATA_TYPE *a, COLN_DATA_TYPE *b);
+- COLN_DATA_EQUALS: (optional) a function with the signature:
+  bool COLN_DATA_EQUALS(COLN_DATA_TYPE *a, COLN_DATA_TYPE *b);
   that is used to determine equality. If not defined, one of two cases is 
   possible:
-  - If COLN_DATA_CMP_FN is defined, it will be used to implement the equality 
+  - If COLN_DATA_COMPARE is defined, it will be used to implement the equality 
     function.
-  - If COLN_DATA_CMP_FN is not defined, the source code for linear search will 
+  - If COLN_DATA_COMPARE is not defined, the source code for linear search will 
     not be included.
-- COLN_DATA_CMP_FN: (optional) a function with the signature:
-  int COLN_DATA_CMP_FN(COLN_DATA_TYPE *a, COLN_DATA_TYPE *b);
+- COLN_DATA_COMPARE: (optional) a function with the signature:
+  int COLN_DATA_COMPARE(COLN_DATA_TYPE *a, COLN_DATA_TYPE *b);
   that will return -1 if a < b, 0 if a == b, or 1 if a > b. If not defined:
   - The source code for sorting array lists will not be included.
   - The source code for binary searching array lists will not be included.
   - Attempts to use tree-based templates will emit a compilation error.
-- COLN_DATA_HASH_FN: (optional) a function with the signature:
-  size_t COLN_DATA_HASH_FN(COLN_DATA_TYPE *to_hash);
+- COLN_DATA_HASH: (optional) a function with the signature:
+  size_t COLN_DATA_HASH(COLN_DATA_TYPE *to_hash);
   that will hash the data in COLN_DATA_TYPE. If not defined, attempts to use 
   hash-table-based templates will emit a compilation error.
 For any map:
