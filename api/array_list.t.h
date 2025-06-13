@@ -5,6 +5,12 @@
 
 #include "coln_result.h"
 
+#ifdef COLN_INTERNAL_DEBUG
+#define COLN_INTERNAL_ASSERT(x) assert(x)
+#else
+#define COLN_INTERNAL_ASSERT(x)
+#endif
+
 #define COLN_CAT_(a, b) a ## b
 #define COLN_CAT(a, b) COLN_CAT_(a, b)
 
@@ -28,6 +34,8 @@
     static bool COLN_DATA_COPY_MANY(COLN_DATA_TYPE *dest, \
                                     COLN_DATA_TYPE *src, \
                                     size_t count)
+// We need the DECLSC below so that if COLN_DATA_COPY_MANY was already defined, 
+// we don't have a stray semicolon at the top level of the file
 #define COLN_DATA__PRIV__COPY_MANY_DECLSC COLN_DATA__PRIV__COPY_MANY_DECL;
 #define COLN_DATA__PRIV__COPY_MANY_DEFN \
     COLN_DATA__PRIV__COPY_MANY_DECL \
@@ -172,7 +180,7 @@
         assert(self); \
         assert(to_insert); \
         ColnResult result; \
-        if(self->len == self->cap && (result = expand(self))) return result; \
+        if(self->len == self->cap && (result = ARRAY_LIST__PRIV__EXPAND(self))) return result; \
         COLN_DATA_MOVE(self->data + self->len, to_insert); \
         self->len++; \
         return COLN_RESULT_SUCCESS; \
@@ -189,7 +197,7 @@
         assert(to_insert); \
         assert(index <= (ptrdiff_t)self->len); \
         ColnResult result; \
-        if(self->len == self->cap && (result = expand(self))) return result; \
+        if(self->len == self->cap && (result = ARRAY_LIST__PRIV__EXPAND(self))) return result; \
         for(ptrdiff_t i = self->len; i > index; i--) \
             COLN_DATA_MOVE(self->data + i, self->data + (i - 1)); \
         COLN_DATA_MOVE(self->data + index, to_insert); \
@@ -253,12 +261,13 @@
         return COLN_RESULT_SUCCESS; \
     }
 
+#define ARRAY_LIST__PRIV__EXPAND COLN_CAT(COLN_TYPE, _expand)
 #define ARRAY_LIST__PRIV__EXPAND_DECL \
-    static ColnResult expand(COLN_TYPE *to_expand)
+    static ColnResult ARRAY_LIST__PRIV__EXPAND(COLN_TYPE *to_expand)
 #define ARRAY_LIST__PRIV__EXPAND_DEFN \
     ARRAY_LIST__PRIV__EXPAND_DECL \
     { \
-        assert(to_expand); \
+        COLN_INTERNAL_ASSERT(to_expand); \
         size_t new_cap = to_expand->cap << 1; \
         COLN_DATA_TYPE *new_buf = COLN_ALLOC(to_expand->allocator, \
                                              sizeof(COLN_DATA_TYPE) * new_cap); \
