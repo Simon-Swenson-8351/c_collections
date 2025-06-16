@@ -151,14 +151,17 @@
     { \
         assert(dest); \
         assert(src); \
-        COLN_ALLOC_ASSIGN(dest->allocator, src->allocator); \
-        dest->len = src->len; \
-        dest->cap = src->cap; \
         dest->data = COLN_ALLOC(src->allocator, \
                                 sizeof(COLN_DATA_TYPE) * src->cap); \
         if(!dest->data) return COLN_RESULT_ALLOC_FAILED; \
         if(!COLN_DATA_COPY_MANY(dest->data, src->data, src->len)) \
+        { \
+            COLN_FREE(dest->data);
             return COLN_RESULT_COPY_ELEM_FAILED; \
+        } \
+        COLN_ALLOC_ASSIGN(dest->allocator, src->allocator); \
+        dest->len = src->len; \
+        dest->cap = src->cap; \
         return COLN_RESULT_SUCCESS; \
     }
 
