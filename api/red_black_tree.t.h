@@ -1,3 +1,10 @@
+#include <assert.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "coln_result.h"
+
 #define COLN_CAT_(a, b) a ## b
 #define COLN_CAT(a, b) COLN_CAT_(a, b)
 
@@ -93,7 +100,7 @@
 
 #ifdef COLN_ALLOC_TYPE
 #define COLN_ALLOC_DECL(allocator) COLN_ALLOC_TYPE *allocator;
-#define COLN_ALLOC_ARG(allocator) COLN_ALLOC_TYPE *allocator
+#define COLN_ALLOC_ARG(allocator) , COLN_ALLOC_TYPE *allocator
 #define COLN_ALLOC_ASSIGN(lval, rval) ((lval) = (rval))
 #define COLN_ALLOC_ASSERT(expr) assert(expr)
 #ifndef COLN_ALLOC
@@ -145,19 +152,19 @@
     typedef struct COLN_TYPE \
     { \
         COLN_ALLOC_DECL(allocator) \
-        RED_BLACK_NODE_TYPE *root; \
-    };
+        RED_BLACK_NODE *root; \
+    } COLN_TYPE;
 
 #define RED_BLACK_TREE_INIT_DECL \
-    void COLN_CAT(COLN_TYPE, _init)(COLN_TYPE *to_init, \
+    void COLN_CAT(COLN_TYPE, _init)(COLN_TYPE *to_init \
                                     COLN_ALLOC_ARG(allocator))
 #define RED_BLACK_TREE_INIT_DEFN \
     RED_BLACK_TREE_INIT_DECL \
     { \
         assert(to_init); \
         COLN_ALLOC_ASSERT(allocator); \
-        COLN_ALLOC_ASSIGN(to_init->allocator, allocator);
-        to_init->root = NULL;
+        COLN_ALLOC_ASSIGN(to_init->allocator, allocator); \
+        to_init->root = NULL; \
     }
 
 #define RED_BLACK_TREE_COPY_DECL \
@@ -168,10 +175,13 @@
         assert(dest); \
         assert(src); \
         COLN_ALLOC_ASSIGN(dest->allocator, src->allocator); \
-        NodeCopyResult cr = RED_BLACK_NODE__PRIV__COPY(src->allocator, \
-                                                       src->root); \
-        if(cr.type != COLN_RESULT_SUCCESS) return cr.type; \
-        dest->root = cr.value; \
+        ColnResult result; \
+        RED_BLACK_NODE *new_node; \
+        if((result = RED_BLACK_NODE__PRIV__COPY_INVOC(&new_node, \
+                                                      src->root, \
+                                                      src->allocator))) \
+            return result; \
+        dest->root = new_node; \
         return COLN_RESULT_SUCCESS; \
     }
 
@@ -180,7 +190,8 @@
 #define RED_BLACK_TREE_CLEAR_DEFN \
     RED_BLACK_TREE_CLEAR_DECL \
     { \
-        RED_BLACK_NODE__PRIV__DESTROY(to_clear->allocator, to_clear->root); \
+        RED_BLACK_NODE__PRIV__DESTROY_INVOC(to_clear->root, \
+                                            to_clear->allocator); \
     }
 
 #define RED_BLACK_TREE_INSERT_DECL \
@@ -202,9 +213,9 @@
         while(*insertion_point) \
         { \
             parent = *insertion_point; \
-            if(COLN_ELEM_COMPARE( \
+            if(COLN_DATA_COMPARE( \
                     &((*insertion_point)->data), \
-                    &(node_to_insert->data) > 0) \
+                    &(node_to_insert->data)) > 0) \
                 insertion_point = &LEFT_CHILD(*insertion_point); \
             else \
                 insertion_point = &RIGHT_CHILD(*insertion_point); \
@@ -226,7 +237,7 @@
         RED_BLACK_NODE *cur = self->root; \
         while(cur) \
         { \
-            int cmp_res = COLN_ELEM_COMPARE(&(cur->data), elem_to_search); \
+            int cmp_res = COLN_DATA_COMPARE(&(cur->data), elem_to_search); \
             if(cmp_res < 0) cur = RIGHT_CHILD(cur); \
             else if(cmp_res == 0) return &(cur->data); \
             else cur = LEFT_CHILD(cur); \
@@ -241,11 +252,11 @@
 #define RED_BLACK_TREE_REMOVE_DEFN \
     RED_BLACK_TREE_REMOVE_DECL \
     { \
-        RED_BLACK_NODE_DIR cur_pos; \
+        NodeDir cur_pos; \
         RED_BLACK_NODE **removal_point = &(self->root); \
         while(*removal_point) \
         { \
-            int cmp_res = COLN_ELEM_COMPARE(&((*removal_point)->data), \
+            int cmp_res = COLN_DATA_COMPARE(&((*removal_point)->data), \
                                             elem_to_remove); \
             if(cmp_res < 0) \
             { \
@@ -261,9 +272,9 @@
                 cur_pos = ND_LEFT; \
                 removal_point = &LEFT_CHILD(*removal_point); \
             } \
-        }
+        } \
         if(!(*removal_point)) return COLN_RESULT_ELEM_NOT_FOUND; \
-        COLN_ELEM_MOVE(removed_elem, &((*removal_point)->data)); \
+        COLN_DATA_MOVE(removed_elem, &((*removal_point)->data)); \
         if(LEFT_CHILD(*removal_point) && RIGHT_CHILD(*removal_point)) \
         { \
             RED_BLACK_NODE **succ_ptr = &RIGHT_CHILD(*removal_point); \
@@ -274,7 +285,7 @@
                 cur_pos = ND_LEFT; \
             } \
             COLN_DATA_MOVE(&((*removal_point)->data), &((*succ_ptr)->data)); \
-            removal_point = succ_ptr;
+            removal_point = succ_ptr; \
         } \
         /*  We want the above case where we replace with successor to */ \
         /* fall-through so that a node is eventually removed. */ \
@@ -294,8 +305,8 @@
         else \
         { \
             *removal_point = NULL; \
-            if(RED_BLACK_NODE__PRIV__COLOR(to_remove) == NC_BLACK) \
-                RED_BLACK_TRE__PRIV__HANDLE_BLACK_VIOLATION( \
+            if(COLOR(to_remove) == NC_BLACK) \
+                RED_BLACK_TREE__PRIV__HANDLE_BLACK_VIOLATION( \
                     self, \
                     to_remove->parent, \
                     cur_pos); \
@@ -313,7 +324,7 @@
     RED_BLACK_NODE__PRIV__DESTROY(to_destroy)
 #endif
 #define RED_BLACK_NODE__PRIV__DESTROY_DECL \
-    static void RED_BLACK_NODE__PRIV__DESTROY(RED_BLACK_NODE *to_destroy, \
+    static void RED_BLACK_NODE__PRIV__DESTROY(RED_BLACK_NODE *to_destroy \
                                               COLN_ALLOC_ARG(allocator))
 #define RED_BLACK_NODE__PRIV__DESTROY_DEFN \
     RED_BLACK_NODE__PRIV__DESTROY_DECL \
@@ -323,7 +334,7 @@
                                             allocator); \
         RED_BLACK_NODE__PRIV__DESTROY_INVOC(RIGHT_CHILD(to_destroy), \
                                             allocator); \
-        COLN_ELEM_CLEAR(&(to_destroy->data)); \
+        COLN_DATA_CLEAR(&(to_destroy->data)); \
         COLN_FREE(allocator, to_destroy); \
     }
 
@@ -346,7 +357,7 @@
         COLN_INTERNAL_ASSERT(new_dest); \
         COLN_INTERNAL_ASSERT(src); \
         COLN_ALLOC_ASSERT(allocator); \
-        if(!to_copy) \
+        if(!src) \
         { \
             *new_dest = NULL; \
             return COLN_RESULT_SUCCESS; \
@@ -358,41 +369,31 @@
             result = COLN_RESULT_ALLOC_FAILED; \
             goto fail_on_alloc; \
         } \
-        if(!COLN_DATA_COPY(&((*new_dest)->data)), &(src->data)) \
+        if(!COLN_DATA_COPY(&((*new_dest)->data), &(src->data))) \
         { \
             result = COLN_RESULT_COPY_ELEM_FAILED; \
             goto fail_on_elem_cp; \
         } \
-        if(result = RED_BLACK_NODE__PRIV__COPY_INVOC(&LEFT_CHILD(*new_dest), \
+        if((result = RED_BLACK_NODE__PRIV__COPY_INVOC(&LEFT_CHILD(*new_dest), \
                                                      LEFT_CHILD(src), \
-                                                     allocator) \
+                                                     allocator))) \
             goto fail_on_left; \
-        if(result = RED_BLACK_NODE__PRIV__COPY_INVOC(&RIGHT_CHILD(*new_dest), \
+        if((result = RED_BLACK_NODE__PRIV__COPY_INVOC(&RIGHT_CHILD(*new_dest), \
                                                      RIGHT_CHILD(src), \
-                                                     allocator) \
+                                                     allocator))) \
             goto fail_on_right; \
-        (*new_dest)->color = to_copy->color; \
+        (*new_dest)->color = src->color; \
         return COLN_RESULT_SUCCESS; \
     fail_on_right: \
         RED_BLACK_NODE__PRIV__DESTROY_INVOC(LEFT_CHILD(*new_dest), \
                                             allocator); \
     fail_on_left: \
-        COLN_ELEM_CLEAR(&((*new_dest)->data)); \
+        COLN_DATA_CLEAR(&((*new_dest)->data)); \
     fail_on_elem_cp: \
         COLN_FREE(allocator, *new_dest); \
         *new_dest = NULL; \
     fail_on_alloc: \
         return result; \
-    }
-
-#define RED_BLACK_NODE__PRIV__COLOR COLN_CAT(RED_BLACK_NODE, _color)
-#define RED_BLACK_NODE__PRIV__COLOR_DECL \
-    static NodeColor RED_BLACK_NODE__PRIV__COLOR(RED_BLACK_NODE *node)
-#define RED_BLACK_NODE__PRIV__COLOR_DEFN \
-    RED_BLACK_NODE__PRIV__COLOR_DECL
-    { \
-        if(!node) return NC_BLACK; \
-        return node->color; \
     }
 
 #define RED_BLACK_NODE__PRIV__ROTATE COLN_CAT(RED_BLACK_NODE, _rotate)
@@ -423,7 +424,7 @@
 #define RED_BLACK_NODE__PRIV__ROTATE_FROM_RR_DECL \
     static void RED_BLACK_NODE__PRIV__ROTATE_FROM_RR(RED_BLACK_NODE **accessor)
 #define RED_BLACK_NODE__PRIV__ROTATE_FROM_RR_DEFN \
-    RED_BLACK_NODE__PRIV__ROTATE_FROM_RR_DECL { rotate(accessor, ND_RIGHT); }
+    RED_BLACK_NODE__PRIV__ROTATE_FROM_RR_DECL { RED_BLACK_NODE__PRIV__ROTATE(accessor, ND_RIGHT); }
 
 #define RED_BLACK_NODE__PRIV__ROTATE_FROM_LL COLN_CAT( \
     RED_BLACK_NODE, \
@@ -431,7 +432,7 @@
 #define RED_BLACK_NODE__PRIV__ROTATE_FROM_LL_DECL \
     static void RED_BLACK_NODE__PRIV__ROTATE_FROM_LL(RED_BLACK_NODE **accessor)
 #define RED_BLACK_NODE__PRIV__ROTATE_FROM_LL_DEFN \
-    RED_BLACK_NODE__PRIV__ROTATE_FROM_LL_DECL { rotate(accessor, ND_LEFT); }
+    RED_BLACK_NODE__PRIV__ROTATE_FROM_LL_DECL { RED_BLACK_NODE__PRIV__ROTATE(accessor, ND_LEFT); }
 
 #define RED_BLACK_NODE__PRIV__ROTATE_FROM_LR COLN_CAT( \
     RED_BLACK_NODE, \
@@ -443,8 +444,8 @@
     { \
         COLN_INTERNAL_ASSERT(accessor); \
         COLN_INTERNAL_ASSERT(*accessor); \
-        rotate(&LEFT_CHILD(*accessor), ND_RIGHT); \
-        rotate(accessor, ND_LEFT); \
+        RED_BLACK_NODE__PRIV__ROTATE(&LEFT_CHILD(*accessor), ND_RIGHT); \
+        RED_BLACK_NODE__PRIV__ROTATE(accessor, ND_LEFT); \
     }
 
 #define RED_BLACK_NODE__PRIV__ROTATE_FROM_RL COLN_CAT( \
@@ -457,8 +458,8 @@
     { \
         COLN_INTERNAL_ASSERT(accessor); \
         COLN_INTERNAL_ASSERT(*accessor); \
-        rotate(&RIGHT_CHILD(*accessor), ND_LEFT); \
-        rotate(accessor, ND_RIGHT); \
+        RED_BLACK_NODE__PRIV__ROTATE(&RIGHT_CHILD(*accessor), ND_LEFT); \
+        RED_BLACK_NODE__PRIV__ROTATE(accessor, ND_RIGHT); \
     }
 
 #define RED_BLACK_TREE__PRIV__HANDLE_RED_VIOLATION COLN_CAT( \
@@ -481,7 +482,11 @@
             else if(node->parent->color == NC_BLACK) return; \
             /* Note: Grandparent exists since parent is red and the root */ \
             /* cannot be red. */ \
-            if(node_color(uncle(node)) == NC_RED) \
+            RED_BLACK_NODE *uncle = \
+                (node->parent == LEFT_CHILD(node->parent->parent)) ? \
+                    RIGHT_CHILD(node->parent->parent) : \
+                    LEFT_CHILD(node->parent->parent); \
+            if(COLOR(uncle) == NC_RED) \
             { \
                 node->parent->parent->color = NC_RED; \
                 LEFT_CHILD(node->parent->parent)->color = NC_BLACK; \
@@ -508,8 +513,7 @@
                 /*  Therefore, setting the next level up (child level) to */ \
                 /*  red will not cause a violation farther down the tree. */ \
                 RED_BLACK_NODE **gp_accessor = \
-                    RED_BLACK_NODE__PRIV__ACCESSOR(tree, \
-                                                   node->parent->parent); \
+                    ACCESSOR(tree, node->parent->parent); \
                 if(node == LEFT_CHILD(node->parent)) \
                 { \
                     if(node->parent == LEFT_CHILD(node->parent->parent)) \
@@ -547,11 +551,11 @@
             RED_BLACK_NODE *sibling = (violator_pos == ND_LEFT) ? \
                 RIGHT_CHILD(parent) : \
                 LEFT_CHILD(parent); \
-            if(RED_BLACK_NODE__PRIV__COLOR(parent) == NC_RED) \
+            if(COLOR(parent) == NC_RED) \
             { \
-                if(RED_BLACK_NODE__PRIV__COLOR(LEFT_CHILD(sibling)) == \
+                if(COLOR(LEFT_CHILD(sibling)) == \
                         NC_BLACK && \
-                    RED_BLACK_NODE__PRIV__COLOR(RIGHT_CHILD(sibling)) == \
+                    COLOR(RIGHT_CHILD(sibling)) == \
                         NC_BLACK) \
                 { \
                     parent->color = NC_BLACK; \
@@ -561,11 +565,11 @@
                 else \
                 { \
                     RED_BLACK_NODE **parent_accessor = \
-                        RED_BLACK_NODE__PRIV__ACCESSOR(tree, parent); \
+                        ACCESSOR(tree, parent); \
                     if(violator_pos == ND_LEFT) \
                     { \
                         /* sibling pos is ND_RIGHT */ \
-                        if(RED_BLACK_NODE__PRIV__COLOR(LEFT_CHILD(sibling)) == \
+                        if(COLOR(LEFT_CHILD(sibling)) == \
                                 NC_RED) \
                             RED_BLACK_NODE__PRIV__ROTATE_FROM_RL( \
                                 parent_accessor); \
@@ -575,7 +579,7 @@
                     else \
                     { \
                         /* sibling pos is ND_LEFT */ \
-                        if(RED_BLACK_NODE__PRIV__COLOR(LEFT_CHILD(sibling)) == \
+                        if(COLOR(LEFT_CHILD(sibling)) == \
                                 NC_RED) \
                             RED_BLACK_NODE__PRIV__ROTATE_FROM_LL( \
                                 parent_accessor); \
@@ -591,12 +595,12 @@
             } \
             else /* node_color(parent) == NODE_COLOR_BLACK */ \
             { \
-                if(RED_BLACK_NODE__PRIV__COLOR(sibling) == NC_RED) \
+                if(COLOR(sibling) == NC_RED) \
                 { \
                     parent->color = NC_RED; \
                     sibling->color = NC_BLACK; \
                     RED_BLACK_NODE **parent_accessor = \
-                        RED_BLACK_NODE__PRIV__ACCESSOR(tree, parent); \
+                        ACCESSOR(tree, parent); \
                     if(violator_pos == ND_LEFT) \
                         RED_BLACK_NODE__PRIV__ROTATE_FROM_RR(parent_accessor); \
                     else RED_BLACK_NODE__PRIV__ROTATE_FROM_LL(parent_accessor);\
@@ -606,9 +610,9 @@
                 } \
                 else \
                 { \
-                    if(RED_BLACK_NODE__PRIV__COLOR(LEFT_CHILD(sibling)) == \
+                    if(COLOR(LEFT_CHILD(sibling)) == \
                             NC_BLACK && \
-                        RED_BLACK_NODE__PRIV__COLOR(RIGHT_CHILD(sibling)) == \
+                        COLOR(RIGHT_CHILD(sibling)) == \
                             NC_BLACK) \
                     { \
                         sibling->color = NC_RED; \
@@ -621,11 +625,11 @@
                     else \
                     { \
                         RED_BLACK_NODE **parent_accessor = \
-                            RED_BLACK_NODE__PRIV__ACCESSOR(tree, parent); \
+                            ACCESSOR(tree, parent); \
                         if(violator_pos == ND_LEFT) \
                         { \
                             /* sibling pos is ND_RIGHT */ \
-                            if(RED_BLACK_NODE__PRIV__COLOR(LEFT_CHILD(sibling))\
+                            if(COLOR(LEFT_CHILD(sibling))\
                                     == NC_RED) \
                                 RED_BLACK_NODE__PRIV__ROTATE_FROM_RL( \
                                     parent_accessor); \
@@ -635,7 +639,7 @@
                         else \
                         { \
                             /* sibling pos is ND_LEFT */ \
-                            if(RED_BLACK_NODE__PRIV__COLOR(LEFT_CHILD(sibling))\
+                            if(COLOR(LEFT_CHILD(sibling))\
                                     == NC_RED) \
                                 RED_BLACK_NODE__PRIV__ROTATE_FROM_LL( \
                                     parent_accessor); \
@@ -653,56 +657,97 @@
         } \
     }
 
-#define RED_BLACK_NODE__PRIV__UNCLE COLN_CAT(RED_BLACK_NODE, _uncle)
-#define RED_BLACK_NODE__PRIV__UNCLE_DECL \
-    static RED_BLACK_NODE *RED_BLACK_NODE__PRIV__UNCLE(RED_BLACK_NODE *node)
-#define RED_BLACK_NODE__PRIV__UNCLE_DEFN \
-    RED_BLACK_NODE__PRIV__UNCLE_DECL \
-    { \
-        COLN_INTERNAL_ASSERT(node); \
-        COLN_INTERNAL_ASSERT(node->parent); \
-        COLN_INTERNAL_ASSERT(node->parent->parent); \
-        return (node->parent == LEFT_CHILD(node->parent->parent)) ? \
-            RIGHT_CHILD(node->parent->parent) : \
-            LEFT_CHILD(node->parent->parent); \
-    }
-
-#define RED_BLACK_NODE__PRIV__ACCESSOR COLN_CAT(RED_BLACK_NODE, _accessor)
-#define RED_BLACK_NODE__PRIV__ACCESSOR_DECL \
-    static RED_BLACK_NODE **RED_BLACK_NODE__PRIV__ACCESSOR( \
-        COLN_TYPE *tree, \
-        RED_BLACK_NODE *node)
-#define RED_BLACK_NODE__PRIV__ACCESSOR_DEFN \
-    RED_BLACK_NODE__PRIV__ACCESSOR \
-    { \
-        if(!(node->parent)) return &(tree->root); \
-        else if(LEFT_CHILD(node->parent) == node) \
-            return &LEFT_CHILD(node->parent); \
-        else return &RIGHT_CHILD(node->parent); \
-    }
-
 #ifdef COLN_HEADER
 RED_BLACK_NODE_DECL;
-RED_BLACK_TREE_STRUCT_DEFN;
+RED_BLACK_TREE_STRUCT_DEFN
 RED_BLACK_TREE_INIT_DECL;
 RED_BLACK_TREE_COPY_DECL;
 RED_BLACK_TREE_CLEAR_DECL;
+RED_BLACK_TREE_INSERT_DECL;
+RED_BLACK_TREE_SEARCH_DECL;
+RED_BLACK_TREE_REMOVE_DECL;
 #endif
 
 #ifdef COLN_IMPL
+#define LEFT_CHILD(node) ((node)->children[(ptrdiff_t)ND_LEFT])
+#define RIGHT_CHILD(node) ((node)->children[(ptrdiff_t)ND_RIGHT])
+#define ACCESSOR(tree, node) \
+    (!((node)->parent) ? \
+        &((tree)->root) : \
+        (LEFT_CHILD((node)->parent) == node ? \
+            &LEFT_CHILD((node)->parent) : \
+            &RIGHT_CHILD((node)->parent)))
+#define COLOR(node) (node ? (node)->color : NC_BLACK)
 RED_BLACK_NODE_COLOR_DEFN
 RED_BLACK_NODE_DIR_DEFN
 RED_BLACK_NODE_DEFN
-#define LEFT_CHILD(node) ((node)->children[(ptrdiff_t)ND_LEFT])
-#define RIGHT_CHILD(node) ((node)->children[(ptrdiff_t)ND_RIGHT])
+COLN_DATA__PRIV__COPY_MANY_DECLSC
+RED_BLACK_NODE__PRIV__COPY_DECL;
+RED_BLACK_NODE__PRIV__DESTROY_DECL;
+RED_BLACK_NODE__PRIV__ROTATE_DECL;
+RED_BLACK_NODE__PRIV__ROTATE_FROM_RR_DECL; 
+RED_BLACK_NODE__PRIV__ROTATE_FROM_LL_DECL; 
+RED_BLACK_NODE__PRIV__ROTATE_FROM_LR_DECL; 
+RED_BLACK_NODE__PRIV__ROTATE_FROM_RL_DECL; 
+RED_BLACK_TREE__PRIV__HANDLE_RED_VIOLATION_DECL; 
+RED_BLACK_TREE__PRIV__HANDLE_BLACK_VIOLATION_DECL; 
 RED_BLACK_TREE_INIT_DEFN
 RED_BLACK_TREE_COPY_DEFN
 RED_BLACK_TREE_CLEAR_DEFN
-
-#undef LEFT_CHILD
+RED_BLACK_TREE_INSERT_DEFN
+RED_BLACK_TREE_SEARCH_DEFN
+RED_BLACK_TREE_REMOVE_DEFN
+COLN_DATA__PRIV__COPY_MANY_DEFN
+RED_BLACK_NODE__PRIV__COPY_DEFN 
+RED_BLACK_NODE__PRIV__DESTROY_DEFN
+RED_BLACK_NODE__PRIV__ROTATE_DEFN
+RED_BLACK_NODE__PRIV__ROTATE_FROM_RR_DEFN
+RED_BLACK_NODE__PRIV__ROTATE_FROM_LL_DEFN
+RED_BLACK_NODE__PRIV__ROTATE_FROM_LR_DEFN
+RED_BLACK_NODE__PRIV__ROTATE_FROM_RL_DEFN
+RED_BLACK_TREE__PRIV__HANDLE_RED_VIOLATION_DEFN
+RED_BLACK_TREE__PRIV__HANDLE_BLACK_VIOLATION_DEFN
+#undef COLOR
+#undef ACCESSOR
 #undef RIGHT_CHILD
+#undef LEFT_CHILD
 #endif
 
+#undef RED_BLACK_TREE__PRIV__HANDLE_BLACK_VIOLATION_DEFN
+#undef RED_BLACK_TREE__PRIV__HANDLE_BLACK_VIOLATION_DECL
+#undef RED_BLACK_TREE__PRIV__HANDLE_BLACK_VIOLATION
+#undef RED_BLACK_TREE__PRIV__HANDLE_RED_VIOLATION_DEFN
+#undef RED_BLACK_TREE__PRIV__HANDLE_RED_VIOLATION_DECL
+#undef RED_BLACK_TREE__PRIV__HANDLE_RED_VIOLATION
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_RL_DEFN
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_RL_DECL
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_RL
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_LR_DEFN
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_LR_DECL
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_LR
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_LL_DEFN
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_LL_DECL
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_LL
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_RR_DEFN
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_RR_DECL
+#undef RED_BLACK_NODE__PRIV__ROTATE_FROM_RR
+#undef RED_BLACK_NODE__PRIV__ROTATE_DEFN
+#undef RED_BLACK_NODE__PRIV__ROTATE_DECL
+#undef RED_BLACK_NODE__PRIV__ROTATE
+#undef RED_BLACK_NODE__PRIV__COPY_DEFN
+#undef RED_BLACK_NODE__PRIV__COPY_DECL
+#undef RED_BLACK_NODE__PRIV__COPY_INVOC
+#undef RED_BLACK_NODE__PRIV__COPY
+#undef RED_BLACK_NODE__PRIV__DESTROY_DEFN
+#undef RED_BLACK_NODE__PRIV__DESTROY_DECL
+#undef RED_BLACK_NODE__PRIV__DESTROY_INVOC
+#undef RED_BLACK_NODE__PRIV__DESTROY
+#undef RED_BLACK_TREE_REMOVE_DEFN
+#undef RED_BLACK_TREE_REMOVE_DECL
+#undef RED_BLACK_TREE_SEARCH_DEFN
+#undef RED_BLACK_TREE_SEARCH_DECL
+#undef RED_BLACK_TREE_INSERT_DEFN
+#undef RED_BLACK_TREE_INSERT_DECL
 #undef RED_BLACK_TREE_CLEAR_DEFN
 #undef RED_BLACK_TREE_CLEAR_DECL
 #undef RED_BLACK_TREE_COPY_DEFN
