@@ -1,4 +1,6 @@
+#include <assert.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include "coln_result.h"
 
@@ -30,16 +32,12 @@
 #endif
 
 #ifndef COLN_DATA_COPY_MANY
-#define HASH_TABLE__PRIV__DATA_COPY_MANY_FNNAME \
-    COLN_CAT(HASH_TABLE_TYPENAME, _data_copy_many)
-#define COLN_DATA_COPY_MANY HASH_TABLE__PRIV__DATA_COPY_MANY_FNNAME
+#define COLN_DATA_COPY_MANY COLN_CAT(HASH_TABLE_TYPENAME, _data_copy_many)
 #define HASH_TABLE__PRIV__DATA_COPY_MANY_SIGN \
-    static bool HASH_TABLE__PRIV__DATA_COPY_MANY_FNNAME( \
+    static bool COLN_DATA_COPY_MANY( \
         COLN_DATA_TYPENAME *dest, \
         COLN_DATA_TYPENAME *src, \
         size_t count)
-#define HASH_TABLE__PRIV__DATA_COPY_MANY_DECL \
-    HASH_TABLE__PRIV__DATA_COPY_MANY_SIGN;
 #define HASH_TABLE__PRIV__DATA_COPY_MANY_DEFN \
     HASH_TABLE__PRIV__DATA_COPY_MANY_SIGN \
     { \
@@ -57,9 +55,7 @@
         return true; \
     }
 #else
-#define HASH_TABLE__PRIV__DATA_COPY_MANY_FNNAME
 #define HASH_TABLE__PRIV__DATA_COPY_MANY_SIGN
-#define HASH_TABLE__PRIV__DATA_COPY_MANY_DECL
 #define HASH_TABLE__PRIV__DATA_COPY_MANY_DEFN
 #endif
 
@@ -84,7 +80,7 @@
 #define COLN_DATA_SWAP(a, b) \
     do \
     { \
-        COLN_DATA_TYPE tmp; \
+        COLN_DATA_TYPENAME tmp; \
         COLN_DATA_MOVE(&tmp, (a)); \
         COLN_DATA_MOVE((a), (b)); \
         COLN_DATA_MOVE((b), &tmp); \
@@ -105,10 +101,6 @@
             COLN_DATA_CLEAR((to_clear) + i); \
         } \
     } while(0)
-#endif
-
-#ifndef HASH_TABLE_TYPENAME
-#define HASH_TABLE_TYPENAME COLN_CAT(COLN_DATA_TYPENAME, _red_black_tree)
 #endif
 
 #ifdef COLN_ALLOC_TYPE
@@ -137,13 +129,18 @@
 #define COLN_ALLOC_INTERNAL_ASSERT(x)
 #endif
 
+#ifndef HASH_TABLE_MAX_LOAD_FACTOR
+#define HASH_TABLE_MAX_LOAD_FACTOR 0.75
+#endif
+
+#ifndef HASH_TABLE_TYPENAME
+#define HASH_TABLE_TYPENAME COLN_CAT(COLN_DATA_TYPENAME, _hash_table)
+#endif
 #define HASH_TABLE_DEFN \
     typedef struct HASH_TABLE_TYPENAME \
     { \
         COLN_ALLOC_DECL(allocator) \
         HASH_TABLE_ENTRY_TYPENAME *entries; \
-        COLN_DATA_TYPENAME *entries; \
-        int *probe_seq_lens; \
         size_t count; \
         size_t cap; \
         int max_probe_seq_len; \
@@ -155,17 +152,16 @@
 #define HASH_TABLE_ENTRY_DEFN \
     typedef struct HASH_TABLE_ENTRY_TYPENAME \
     { \
-        size_t hash_val; \
+        size_t hash; \
         int probe_seq_len; \
         COLN_DATA_TYPENAME data; \
     } HASH_TABLE_ENTRY_TYPENAME;
 
-#define HASH_TABLE_INIT_FNNAME COLN_CAT(HASH_TABLE_TYPENAME, _init)
 #define HASH_TABLE_INIT_SIGN \
-    ColnResult HASH_TABLE_INIT_FNNAME(HASH_TABLE_TYPENAME *to_init \
-                                      COLN_ALLOC_ARG(allocator), \
-                                      int initial_cap_exp)
-#define HASH_TABLE_INIT_DECL HASH_TABLE_INIT_SIGN;
+    ColnResult COLN_CAT(HASH_TABLE_TYPENAME, _init)( \
+        HASH_TABLE_TYPENAME *to_init \
+        COLN_ALLOC_ARG(allocator), \
+        int initial_cap_exp)
 #define HASH_TABLE_INIT_DEFN \
     HASH_TABLE_INIT_SIGN \
     { \
@@ -185,34 +181,32 @@
         return COLN_RESULT_SUCCESS; \
     }
 
-#define HASH_TABLE_COPY_FNNAME COLN_CAT(HASH_TABLE_TYPENAME, _copy)
 #define HASH_TABLE_COPY_SIGN \
-    ColnResult HASH_TABLE_COPY_FNNAME(HASH_TABLE_TYPENAME *dest, \
-                                      HASH_TABLE_TYPENAME *src)
-#define HASH_TABLE_COPY_DECL HASH_TABLE_COPY_SIGN;
+    ColnResult COLN_CAT(HASH_TABLE_TYPENAME, _copy)(HASH_TABLE_TYPENAME *dest, \
+                                                    HASH_TABLE_TYPENAME *src)
 #define HASH_TABLE_COPY_DEFN \
     HASH_TABLE_COPY_SIGN \
     { \
         assert(dest); \
         assert(src); \
-        if(!(to_init->entries = COLN_ALLOC( \
+        if(!(dest->entries = COLN_ALLOC( \
                 allocator, \
                 sizeof(HASH_TABLE_ENTRY_TYPENAME) * src->cap))) \
             return COLN_RESULT_ALLOC_FAILED; \
         for(ptrdiff_t i = 0; i < (ptrdiff_t)src->cap; i++) \
         { \
+            dest->entries[i].probe_seq_len = src->entries[i].probe_seq_len; \
             if(src->entries[i].probe_seq_len < 0) continue; \
-            if(!COLN_DATA_COPY(dest->entries + i, src->entries + i)) \
+            dest->entries[i].hash = src->entries[i].hash; \
+            if(!COLN_DATA_COPY(&(dest->entries[i].data), \
+                               &(src->entries[i].data))) \
             { \
                 for(ptrdiff_t j = i - 1; j >= 0; j--) \
-                { \
-                    COLN_CLEAR(dest->entries[j]); \
-                } \
+                    COLN_DATA_CLEAR(&(dest->entries[j].data)); \
                 COLN_FREE(src->allocator, dest->entries); \
                 return COLN_RESULT_COPY_ELEM_FAILED; \
             } \
         } \
-        memcpy(dest->probe_seq_lens, src->probe_seq_lens, col_ct_size); \
         COLN_ALLOC_ASSIGN(dest->allocator, src->allocator); \
         dest->cap = src->cap; \
         dest->count = src->count; \
@@ -220,27 +214,26 @@
         return COLN_RESULT_SUCCESS; \
     }
 
-#define HASH_TABLE_CLEAR_FNNAME COLN_CAT(HASH_TABLE_TYPENAME, _clear)
 #define HASH_TABLE_CLEAR_SIGN \
-    void HASH_TABLE_CLEAR_FNNAME(HASH_TABLE_TYPENAME *to_clear)
-#define HASH_TABLE_CLEAR_DECL HASH_TABLE_CLEAR_SIGN;
+    void COLN_CAT(HASH_TABLE_TYPENAME, _clear)(HASH_TABLE_TYPENAME *to_clear)
 #define HASH_TABLE_CLEAR_DEFN \
     HASH_TABLE_CLEAR_SIGN \
     { \
         assert(to_clear); \
-        for(intptr_t i = 0; i < to_clear->cap; i++) \
+        for(intptr_t i = 0; i < (intptr_t)to_clear->cap; i++) \
         { \
-           if(to_clear->probe_seq_lens[i] < 0) continue; \
-           COLN_DATA_CLEAR(&(to_clear->entries[i])); \
+            if(to_clear->entries[i].probe_seq_len >= 0) \
+            { \
+                COLN_DATA_CLEAR(&(to_clear->entries[i].data)); \
+            } \
         } \
         COLN_FREE(to_clear->allocator, to_clear->entries); \
     }
 
-#define HASH_TABLE_INSERT_FNNAME COLN_CAT(HASH_TABLE_TYPENAME, _insert)
 #define HASH_TABLE_INSERT_SIGN \
-    ColnResult HASH_TABLE_INSERT_FNNAME(HASH_TABLE_TYPENAME *hash_table, \
-                                        COLN_DATA_TYPENAME *to_insert)
-#define HASH_TABLE_INSERT_DECL HASH_TABLE_INSERT_SIGN;
+    ColnResult COLN_CAT(HASH_TABLE_TYPENAME, _insert)( \
+        HASH_TABLE_TYPENAME *hash_table, \
+        COLN_DATA_TYPENAME *to_insert)
 #define HASH_TABLE_INSERT_DEFN \
     HASH_TABLE_INSERT_SIGN \
     { \
@@ -248,118 +241,166 @@
         assert(to_insert); \
         float load_factor = (float)(hash_table->cap) / \
             (float)(hash_table->count + 1); \
-        if((load_factor > MAX_LOAD_FACTOR) && \
+        if((load_factor > HASH_TABLE_MAX_LOAD_FACTOR) && \
                 !HASH_TABLE__PRIV__EXPAND_FNNAME(hash_table)) \
             return COLN_RESULT_ALLOC_FAILED; \
-        size_t ins_max_probe_seq = HASH_TABLE__PRIV__INTERNAL_INSERT_FNNAME( \
+        size_t hash = COLN_DATA_HASH(to_insert); \
+        int ins_max_probe_seq = HASH_TABLE__PRIV__INTERNAL_INSERT_FNNAME( \
             hash_table->entries, \
-            hash_table->probe_seq_lens, \
             hash_table->cap, \
-            to_insert); \
+            to_insert, \
+            hash); \
         if(ins_max_probe_seq > hash_table->max_probe_seq_len) \
             hash_table->max_probe_seq_len = ins_max_probe_seq; \
+        hash_table->count++; \
         return COLN_RESULT_SUCCESS; \
     }
 
-#define HASH_TABLE_SEARCH_FNNAME COLN_CAT(HASH_TABLE_TYPENAME, _search)
 #define HASH_TABLE_SEARCH_SIGN \
-    COLN_DATA_TYPENAME *HASH_TABLE_SEARCH_FNNAME( \
+    COLN_DATA_TYPENAME *COLN_CAT(HASH_TABLE_TYPENAME, _search)( \
         HASH_TABLE_TYPENAME *hash_table, \
         COLN_DATA_TYPENAME *elem_to_find)
-#define HASH_TABLE_SEARCH_DECL HASH_TABLE_SEARCH_SIGN;
 #define HASH_TABLE_SEARCH_DEFN \
     HASH_TABLE_SEARCH_SIGN \
     { \
         assert(hash_table); \
         assert(elem_to_find); \
         size_t idx_mask = hash_table->cap - 1; \
-        size_t base_idx = COLN_DATA_HASH(elem_to_find) & idx_mask; \
-        for(size_t misses = 0; \
+        size_t hash = COLN_DATA_HASH(elem_to_find); \
+        size_t base_idx = hash & idx_mask; \
+        for(int misses = 0; \
                 misses <= hash_table->max_probe_seq_len; \
                 misses++) \
         { \
-            size_t cur_idx = (base_idx + misses) & idx_mask; \
-            if()
+            size_t i = (base_idx + misses) & idx_mask; \
+            if(hash_table->entries[i].probe_seq_len < 0) return NULL; \
+            if(hash == hash_table->entries[i].hash) \
+                return &(hash_table->entries[i].data); \
+        } \
+        return NULL; \
+    }
+
+#define HASH_TABLE_REMOVE_SIGN \
+    ColnResult COLN_CAT(HASH_TABLE_TYPENAME, _remove)( \
+        HASH_TABLE_TYPENAME *hash_table, \
+        COLN_DATA_TYPENAME *to_remove, \
+        COLN_DATA_TYPENAME *removed)
+#define HASH_TABLE_REMOVE_DEFN \
+    HASH_TABLE_REMOVE_SIGN \
+    { \
+        assert(hash_table); \
+        assert(to_remove); \
+        assert(removed); \
+        size_t idx_mask = hash_table->cap - 1; \
+        size_t hash = COLN_DATA_HASH(to_remove); \
+        size_t base_idx = hash & idx_mask; \
+        size_t cur; \
+        for(int misses = 0; true; misses++) \
+        { \
+            if(misses > hash_table->max_probe_seq_len) \
+                return COLN_RESULT_ELEM_NOT_FOUND; \
+            cur = (base_idx + misses) & idx_mask; \
+            if(hash_table->entries[cur].probe_seq_len < 0) \
+                return COLN_RESULT_ELEM_NOT_FOUND; \
+            if(hash == hash_table->entries[cur].hash) break; \
+        } \
+        COLN_DATA_MOVE(removed, &(hash_table->entries[cur].data)); \
+        size_t next = (cur + 1) & idx_mask; \
+        while(hash_table->entries[next].probe_seq_len > 0) \
+        { \
+            COLN_DATA_MOVE(&(hash_table->entries[cur].data), \
+                           &(hash_table->entries[next].data)); \
+            hash_table->entries[cur].probe_seq_len = \
+                hash_table->entries[next].probe_seq_len - 1; \
+            hash_table->entries[cur].hash = \
+                hash_table->entries[next].hash; \
+            cur = next; \
+            next = (next + 1) & idx_mask; \
+        } \
+        hash_table->entries[cur].probe_seq_len = -1; \
+        hash_table->count--; \
+        return COLN_RESULT_SUCCESS; \
+    }
+
+#define HASH_TABLE_FOR_EACH_SIGN \
+    void COLN_CAT(HASH_TABLE_TYPENAME, _for_each)( \
+        HASH_TABLE_TYPENAME *hash_table, \
+        void *capture, \
+        void(*lambda)(void *capture, \
+                      COLN_DATA_TYPENAME *data))
+#define HASH_TABLE_FOR_EACH_DEFN \
+    HASH_TABLE_FOR_EACH_SIGN \
+    { \
+        for(intptr_t i = 0; i < (intptr_t)hash_table->cap; i++) \
+        { \
+            if(hash_table->entries[i].probe_seq_len < 0) continue; \
+            lambda(capture, &(hash_table->entries[i].data)); \
         } \
     }
 
-#define HASH_TABLE__PRIV__NEW_BUF_FNNAME COLN_CAT(HASH_TABLE_TYPENAME, _new_buf)
-#define HASH_TABLE__PRIV__NEW_BUF_SIGN \
-    static bool HASH_TABLE__PRIV__NEW_BUF_FNNAME( \
-        size_t cap \
-        COLN_ALLOC_ARG(allocator), \
-        COLN_DATA_TYPENAME **new_entries, \
-        int **new_probe_seq_lens)
-#ifdef COLN_ALLOC_TYPE
-#define HASH_TABLE__PRIV__NEW_BUF_INVOC(cap, \
-                                        allocator, \
-                                        new_entries, \
-                                        new_probe_seq_lens) \
-    HASH_TABLE__PRIV__NEW_BUF_FNNAME((cap), \
-                                     (allocator), \
-                                     (new_entries), \
-                                     (new_probe_seq_lens))
-#else
-#define HASH_TABLE__PRIV__NEW_BUF_INVOC(cap, \
-                                        allocator, \
-                                        new_entries, \
-                                        new_probe_seq_lens) \
-    HASH_TABLE__PRIV__NEW_BUF_FNNAME((cap), \
-                                     (new_entries), \
-                                     (new_probe_seq_lens))
-#endif
-#define HASH_TABLE__PRIV__NEW_BUF_DECL HASH_TABLE__PRIV__NEW_BUF_SIGN;
-#define HASH_TABLE__PRIV__NEW_BUF_DEFN \
-    HASH_TABLE__PRIV__NEW_BUF_SIGN \
+#define HASH_TABLE_ITER_TYPENAME COLN_CAT(HASH_TABLE_TYPENAME, _iterator)
+#define HASH_TABLE_ITER_DEFN \
+    typedef struct HASH_TABLE_ITER_TYPENAME \
     { \
-        COLN_INTERNAL_ASSERT(cap > 0); \
-        COLN_ALLOC_INTERNAL_ASSERT(allocator); \
-        COLN_INTERNAL_ASSERT(new_entries); \
-        COLN_INTERNAL_ASSERT(new_probe_seq_lens); \
-        size_t alloc_size = sizeof(COLN_DATA_TYPENAME) * cap; \
-        alloc_size = COLN_ALIGN(alignof(int), alloc_size); \
-        size_t probe_seq_lens_offset = alloc_size; \
-        alloc_size += sizeof(int) * cap; \
-        *new_entries = COLN_ALLOC(allocator, alloc_size); \
-        if(!(*new_entries)) return false;
-        *new_probe_seq_lens = (int *) \
-            ((unsigned char *)(*new_entries) + probe_seq_lens_offset); \
-        return true;
+        HASH_TABLE_ENTRY_TYPENAME *end_invalid; \
+        HASH_TABLE_ENTRY_TYPENAME *cur; \
+    } HASH_TABLE_ITER_TYPENAME;
+
+#define HASH_TABLE_ITER_INIT_SIGN \
+    void COLN_CAT(HASH_TABLE_ITER_TYPENAME, _init)( \
+        HASH_TABLE_TYPENAME *hash_table, \
+        HASH_TABLE_ITER_TYPENAME *to_init)
+#define HASH_TABLE_ITER_INIT_DEFN \
+    HASH_TABLE_ITER_INIT_SIGN \
+    { \
+        assert(hash_table); \
+        assert(to_init); \
+        to_init->end_invalid = hash_table->entries + hash_table->cap; \
+        to_init->cur = hash_table->entries; \
+    }
+
+#define HASH_TABLE_ITER_NEXT_SIGN \
+    bool COLN_CAT(HASH_TABLE_ITER_TYPENAME, _next)( \
+        HASH_TABLE_ITER_TYPENAME *iter)
+#define HASH_TABLE_ITER_NEXT_DEFN \
+    HASH_TABLE_ITER_NEXT_SIGN \
+    { \
+        assert(iter); \
+        assert(iter->cur != iter->end_invalid); \
+        while(true) \
+        { \
+            iter->cur++; \
+            if(iter->cur == iter->end_invalid) return false; \
+            if(iter->cur->probe_seq_len >= 0) return true; \
+        } \
     }
 
 #define HASH_TABLE__PRIV__EXPAND_FNNAME COLN_CAT(HASH_TABLE_TYPENAME, _expand)
 #define HASH_TABLE__PRIV__EXPAND_SIGN \
     static bool HASH_TABLE__PRIV__EXPAND_FNNAME(HASH_TABLE_TYPENAME *to_expand)
-#define HASH_TABLE__PRIV__EXPAND_DECL HASH_TABLE__PRIV__EXPAND_SIGN;
 #define HASH_TABLE__PRIV__EXPAND_DEFN \
     HASH_TABLE__PRIV__EXPAND_SIGN \
     { \
         COLN_INTERNAL_ASSERT(to_expand); \
         size_t new_cap = to_expand->cap << 1; \
-        assert(new_cap > to_expand->cap); \
-        COLN_DATA_TYPENAME *new_entries;
-        int *new_probe_seq_lens;
-        if(!HASH_TABLE__PRIV__NEW_BUF_INVOC(new_cap, \
-                                        to_expand->allocator, \
-                                        &new_entries, \
-                                        &new_probe_seq_lens)) \
-            return false; \
-        size_t max_probe_seq_len = 0; \
+        HASH_TABLE_ENTRY_TYPENAME *new_entries = COLN_ALLOC( \
+            to_expand->allocator, \
+            sizeof(HASH_TABLE_ENTRY_TYPENAME) * new_cap); \
+        if(!new_entries) return false; \
+        int max_probe_seq_len = 0; \
         for(intptr_t i = 0; i < (intptr_t)(to_expand->cap); i++) \
         { \
-            if(to_expand->probe_seq_lens[i] < 0) continue; \
-            size_t ins_probe_seq_len = \
-                HASH_TABLE__PRIV__INTERNAL_INSERT_FNNAME( \
+            if(to_expand->entries[i].probe_seq_len < 0) continue; \
+            int ins_probe_seq_len = HASH_TABLE__PRIV__INTERNAL_INSERT_FNNAME( \
                     new_entries, \
-                    new_probe_seq_lens, \
                     new_cap, \
-                    to_expand->entries + i); \
+                    &(to_expand->entries[i].data), \
+                    to_expand->entries[i].hash); \
             if(ins_probe_seq_len > max_probe_seq_len) \
                 max_probe_seq_len = ins_probe_seq_len; \
         } \
         COLN_FREE(to_expand->allocator, to_expand->entries); \
         to_expand->entries = new_entries; \
-        to_expand->probe_seq_lens = new_probe_seq_lens; \
         to_expand->cap = new_cap; \
         to_expand->max_probe_seq_len = max_probe_seq_len; \
         return true; \
@@ -368,48 +409,52 @@
 #define HASH_TABLE__PRIV__INTERNAL_INSERT_FNNAME \
     COLN_CAT(HASH_TABLE_TYPENAME, _internal_insert)
 #define HASH_TABLE__PRIV__INTERNAL_INSERT_SIGN \
-    static size_t HASH_TABLE__PRIV__INTERNAL_INSERT_FNNAME( \
-        COLN_DATA_TYPENAME *entries, \
-        int *probe_seq_lens, \
+    static int HASH_TABLE__PRIV__INTERNAL_INSERT_FNNAME( \
+        HASH_TABLE_ENTRY_TYPENAME *entries, \
         size_t cap, \
-        COLN_DATA_TYPENAME *to_insert)
-#define HASH_TABLE__PRIV__INTERNAL_INSERT_DECL \
-    HASH_TABLE__PRIV__INTERNAL_INSERT_SIGN;
+        COLN_DATA_TYPENAME *to_insert, \
+        size_t to_insert_hash)
 #define HASH_TABLE__PRIV__INTERNAL_INSERT_DEFN \
     HASH_TABLE__PRIV__INTERNAL_INSERT_SIGN \
     { \
         COLN_INTERNAL_ASSERT(entries); \
-        COLN_INTERNAL_ASSERT(probe_seq_lens); \
         COLN_INTERNAL_ASSERT(IS_POW_2(cap)); \
         COLN_INTERNAL_ASSERT(to_insert); \
-        COLN_INTERNAL_ASSERT(HASH_TABLE__PRIV__HAS_SLOT_FNNAME(probe_seq_lens, \
+        COLN_INTERNAL_ASSERT(HASH_TABLE__PRIV__HAS_SLOT_FNNAME(entries, \
                                                                cap)); \
-        /* precond: the table has at least one open slot */ \
-        /* should we test that here in an assert? */ \
         size_t mod_mask = cap - 1; \
-        size_t index = COLN_DATA_HASH(to_insert) & mod_mask; \
         int misses = 0; \
         int result = 0; \
-        while(true) \
+        for(size_t index = to_insert_hash & mod_mask; \
+                true; \
+                index = (index + 1) & mod_mask) \
         { \
-            if(probe_seq_lens[index] < 0) \
+            if(entries[index].probe_seq_len < 0) \
             { \
                 /* the slot is not in use */ \
-                probe_seq_lens[index] = misses; \
-                COLN_DATA_MOVE(entries + index, to_insert); \
+                entries[index].hash = to_insert_hash; \
+                entries[index].probe_seq_len = misses; \
+                COLN_DATA_MOVE(&(entries[index].data), to_insert); \
                 return result; \
             } \
             /* the slot is in use */ \
-            if(misses > probe_seq_lens[index]) \
+            if(misses > entries[index].probe_seq_len) \
             { \
-                /* robin hood */ \
-                COLN_DATA_SWAP(entries + index, to_insert); \
-                int swap_var = misses; \
-                misses = probe_seq_lens[index]; \
-                probe_seq_lens[index] = misses; \
+                /* Robin Hood */ \
+                /* We're homeless and poorer than the data at the current */ \
+                /* index, steal its home. */ \
+                COLN_DATA_SWAP(&(entries[index].data), to_insert); \
+                int ps_swap_var = misses; \
+                misses = entries[index].probe_seq_len; \
+                entries[index].probe_seq_len = ps_swap_var; \
+                size_t hash_swap_var = to_insert_hash; \
+                to_insert_hash = entries[index].hash; \
+                entries[index].hash = hash_swap_var; \
             } \
+            /* If we consider the case where we just stole a slot, pretend */ \
+            /* that it just missed its slot instead. Stealing a slot */ \
+            /* can be considered a miss for the element we just stole from. */ \
             if(++misses > result) result = misses; \
-            index = (index + 1) & mod_mask; \
         } \
     }
 
@@ -417,31 +462,59 @@
 #define HASH_TABLE__PRIV__HAS_SLOT_FNNAME COLN_CAT(HASH_TABLE_TYPENAME, \
                                                    _has_slot)
 #define HASH_TABLE__PRIV__HAS_SLOT_SIGN \
-    static bool HASH_TABLE__PRIV__HAS_SLOT_FNNAME(int *probe_seq_lens, \
-                                                  size_t cap)
+    static bool HASH_TABLE__PRIV__HAS_SLOT_FNNAME( \
+        HASH_TABLE_ENTRY_TYPENAME *entries, \
+        size_t cap)
 #define HASH_TABLE__PRIV__HAS_SLOT_DECL HASH_TABLE__PRIV__HAS_SLOT_SIGN;
 #define HASH_TABLE__PRIV__HAS_SLOT_DEFN \
     HASH_TABLE__PRIV__HAS_SLOT_SIGN \
     { \
         for(ptrdiff_t i = 0; i < (ptrdiff_t)cap; i++) \
-            if(probe_seq_lens[i] < 0) return true; \
+            if(entries[i].probe_seq_len < 0) return true; \
         return false; \
     }
 #else
+#define HASH_TABLE__PRIV__HAS_SLOT_FNNAME true
+#define HASH_TABLE__PRIV__HAS_SLOT_SIGN
+#define HASH_TABLE__PRIV__HAS_SLOT_DECL
+#define HASH_TABLE__PRIV__HAS_SLOT_DEFN
 #endif
 
 #ifdef COLN_HEADER
+HASH_TABLE_ENTRY_DECL
+HASH_TABLE_DEFN
+HASH_TABLE_ITER_DEFN
+HASH_TABLE_INIT_SIGN;
+HASH_TABLE_COPY_SIGN;
+HASH_TABLE_CLEAR_SIGN;
+HASH_TABLE_INSERT_SIGN;
+HASH_TABLE_SEARCH_SIGN;
+HASH_TABLE_REMOVE_SIGN;
+HASH_TABLE_FOR_EACH_SIGN;
+HASH_TABLE_ITER_INIT_SIGN;
+HASH_TABLE_ITER_NEXT_SIGN;
 #endif
 
 #ifdef COLN_IMPL
 #define COLN_ALIGN(dtype_alignment, given_bytes) \
     (((given_bytes) + (dtype_alignment) - 1) & ~((dtype_alignment) - 1))
-#define MAX_LOAD_FACTOR 0.75
-#define MAX_COLLISION_COUNT 15
 #define IS_POW_2(x) ((x) && !((x) & ((x) - 1)))
-
+HASH_TABLE_ENTRY_DEFN
+HASH_TABLE__PRIV__EXPAND_SIGN;
+HASH_TABLE__PRIV__INTERNAL_INSERT_SIGN;
+HASH_TABLE__PRIV__HAS_SLOT_DECL
+HASH_TABLE_INIT_DEFN
+HASH_TABLE_COPY_DEFN
+HASH_TABLE_CLEAR_DEFN
+HASH_TABLE_INSERT_DEFN
+HASH_TABLE_SEARCH_DEFN
+HASH_TABLE_REMOVE_DEFN
+HASH_TABLE_FOR_EACH_DEFN
+HASH_TABLE_ITER_INIT_DEFN
+HASH_TABLE_ITER_NEXT_DEFN
+HASH_TABLE__PRIV__EXPAND_DEFN
+HASH_TABLE__PRIV__INTERNAL_INSERT_DEFN
+HASH_TABLE__PRIV__HAS_SLOT_DEFN
 #undef IS_POW_2
-#undef MAX_COLLISION_COUNT
-#undef MAX_LOAD_FACTOR
 #undef COLN_ALIGN
 #endif
