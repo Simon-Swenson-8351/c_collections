@@ -127,15 +127,15 @@
 
 #define ARRAY_LIST_INIT_DECL \
     coln_result COLN_CAT(COLN_TYPE, _init)(COLN_TYPE *to_init, \
-                                  COLN_ALLOC_ARG(allocator) \
-                                  unsigned int initial_cap_exp)
+                                           COLN_ALLOC_ARG(allocator) \
+                                           size_t initial_cap)
 #define ARRAY_LIST_INIT_DEFN \
     ARRAY_LIST_INIT_DECL \
     { \
         assert(to_init); \
         COLN_ALLOC_ASSERT(allocator); \
         COLN_ALLOC_ASSIGN(to_init->allocator, allocator); \
-        to_init->cap = 1 << initial_cap_exp; \
+        to_init->cap = initial_cap; \
         to_init->data = COLN_ALLOC( \
             allocator, \
             sizeof(COLN_DATA_TYPE) * to_init->cap); \

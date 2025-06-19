@@ -12,7 +12,7 @@ int main(int argc, char **argv)
   (void)argc;
   (void)argv;
   int_array_list my_al;
-  assert(int_array_list_init(&my_al, 2) == COLN_RESULT_SUCCESS);
+  assert(int_array_list_init(&my_al, 4) == COLN_RESULT_SUCCESS);
   int tmp = 20;
   assert(int_array_list_push_back(&my_al, &tmp) == COLN_RESULT_SUCCESS);
   assert(my_al.data[0] == 20);

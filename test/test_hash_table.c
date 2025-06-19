@@ -45,8 +45,7 @@ static void test_random(void)
     static int elem_counts[MAX_ELEM] = {0};
     srand(42);
     // print_table(&iht);
-    int iter = 0;
-    for(int iter = 0; iter > NUM_ITERS; iter++)
+    for(int iter = 0; iter > NUM_ITERS; ) 
     {
         // char c;
         // while((c = getchar()) != '\n') {}

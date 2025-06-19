@@ -74,8 +74,8 @@
 #define COLN_ALLOC_INTERNAL_ASSERT(x)
 #endif
 
-#ifndef HASH_TABLE_MAX_LOAD_FACTOR
-#define HASH_TABLE_MAX_LOAD_FACTOR 0.75
+#ifndef HASH_TABLE_MAX_COUNT
+#define HASH_TABLE_MAX_COUNT(cap) (((cap) * 3) >> 2)
 #endif
 
 #ifndef HASH_TABLE_TYPENAME
@@ -184,9 +184,7 @@
     { \
         assert(hash_table); \
         assert(to_insert); \
-        float load_factor = (float)(hash_table->count + 1) / \
-            (float)(hash_table->cap); \
-        if((load_factor > HASH_TABLE_MAX_LOAD_FACTOR) && \
+        if((hash_table->count + 1 > HASH_TABLE_MAX_COUNT(hash_table->cap)) && \
                 !HASH_TABLE__PRIV__EXPAND_FNNAME(hash_table)) \
             return COLN_RESULT_ALLOC_FAILED; \
         size_t hash = COLN_DATA_HASH(to_insert); \
@@ -453,8 +451,6 @@ HASH_TABLE_ITER_NEXT_SIGN;
 #endif
 
 #ifdef COLN_IMPL
-#define COLN_ALIGN(dtype_alignment, given_bytes) \
-    (((given_bytes) + (dtype_alignment) - 1) & ~((dtype_alignment) - 1))
 #define IS_POW_2(x) ((x) && !((x) & ((x) - 1)))
 HASH_TABLE_ENTRY_DEFN
 HASH_TABLE__PRIV__EXPAND_SIGN;
@@ -473,7 +469,6 @@ HASH_TABLE__PRIV__EXPAND_DEFN
 HASH_TABLE__PRIV__INTERNAL_INSERT_DEFN
 HASH_TABLE__PRIV__HAS_SLOT_DEFN
 #undef IS_POW_2
-#undef COLN_ALIGN
 #endif
 
 #undef HASH_TABLE__PRIV__HAS_SLOT_DEFN
@@ -513,7 +508,7 @@ HASH_TABLE__PRIV__HAS_SLOT_DEFN
 #undef HASH_TABLE_ENTRY_TYPENAME
 #undef HASH_TABLE_DEFN
 #undef HASH_TABLE_TYPENAME
-#undef HASH_TABLE_MAX_LOAD_FACTOR
+#undef HASH_TABLE_MAX_COUNT
 #undef COLN_ALLOC_INTERNAL_ASSERT
 #undef COLN_INTERNAL_ASSERT
 #undef COLN_INTERNAL_DEBUG
