@@ -7,12 +7,6 @@
 #define COLN_CAT_(a, b) a ## b
 #define COLN_CAT(a, b) COLN_CAT_(a, b)
 
-#ifdef COLN_INTERNAL_DEBUG
-#define COLN_INTERNAL_ASSERT(x) assert(x)
-#else
-#define COLN_INTERNAL_ASSERT(x)
-#endif
-
 #if !defined(COLN_HEADER) && !defined(COLN_IMPL)
 #error "COLN_HEADER or COLN_IMPL must be defined"
 #endif
@@ -27,53 +21,14 @@
 
 #ifndef COLN_DATA_COPY
 #define COLN_DATA_COPY(dest_ptr, src_ptr) (*(dest_ptr) = *(src_ptr), true)
-#define COLN_DATA_COPY_MANY(dest_ptr, src_ptr, count) \
-    (memcpy((dest_ptr), (src_ptr), sizeof(COLN_DATA_TYPENAME) * (count)), true)
-#endif
-
-#ifndef COLN_DATA_COPY_MANY
-#define COLN_DATA_COPY_MANY COLN_CAT(HASH_TABLE_TYPENAME, _data_copy_many)
-#define HASH_TABLE__PRIV__DATA_COPY_MANY_SIGN \
-    static bool COLN_DATA_COPY_MANY( \
-        COLN_DATA_TYPENAME *dest, \
-        COLN_DATA_TYPENAME *src, \
-        size_t count)
-#define HASH_TABLE__PRIV__DATA_COPY_MANY_DEFN \
-    HASH_TABLE__PRIV__DATA_COPY_MANY_SIGN \
-    { \
-        for(ptrdiff_t i = 0; i < count; i++) \
-        { \
-            if(!COLN_DATA_COPY(dest + i, src + i)) \
-            { \
-                for(ptrdiff_t j = i - 1; j >= 0; j--) \
-                { \
-                    COLN_DATA_CLEAR(dest + j); \
-                } \
-                return false; \
-            } \
-        } \
-        return true; \
-    }
-#else
-#define HASH_TABLE__PRIV__DATA_COPY_MANY_SIGN
-#define HASH_TABLE__PRIV__DATA_COPY_MANY_DEFN
 #endif
 
 #ifndef COLN_DATA_MOVE
 #define COLN_DATA_MOVE(dest_ptr, src_ptr) (*(dest_ptr) = *(src_ptr))
-#define COLN_DATA_MOVE_MANY(dest_ptr, src_ptr, count) \
-    memcpy((dest_ptr), (src_ptr), sizeof(COLN_DATA_TYPENAME) * (count))
 #endif
 
-#ifndef COLN_DATA_MOVE_MANY
-#define COLN_DATA_MOVE_MANY(dest_ptr, src_ptr, count) \
-    do \
-    { \
-        for(ptrdiff_t i = 0; i < (count); i++) \
-        { \
-            COLN_DATA_MOVE((dest_ptr) + i, (src_ptr) + i); \
-        } \
-    } while(0)
+#ifndef COLN_DATA_CLEAR
+#define COLN_DATA_CLEAR(to_clear_ptr)
 #endif
 
 #ifndef COLN_DATA_SWAP
@@ -84,22 +39,6 @@
         COLN_DATA_MOVE(&tmp, (a)); \
         COLN_DATA_MOVE((a), (b)); \
         COLN_DATA_MOVE((b), &tmp); \
-    } while(0)
-#endif
-
-#ifndef COLN_DATA_CLEAR
-#define COLN_DATA_CLEAR(to_clear_ptr)
-#define COLN_DATA_CLEAR_MANY(to_clear_ptr, count)
-#endif
-
-#ifndef COLN_DATA_CLEAR_MANY
-#define COLN_DATA_CLEAR_MANY(to_clear, count)
-    do \
-    { \
-        for(ptrdiff_t i = 0; i < count; i++) \
-        { \
-            COLN_DATA_CLEAR((to_clear) + i); \
-        } \
     } while(0)
 #endif
 
@@ -121,6 +60,12 @@
 #define COLN_ALLOC_ASSERT(expr)
 #define COLN_ALLOC(allocator, size_to_alloc) malloc(size_to_alloc)
 #define COLN_FREE(allocator, ptr_to_free) free(ptr_to_free)
+#endif
+
+#ifdef COLN_INTERNAL_DEBUG
+#define COLN_INTERNAL_ASSERT(x) assert(x)
+#else
+#define COLN_INTERNAL_ASSERT(x)
 #endif
 
 #if defined(COLN_INTERNAL_DEBUG) && defined(COLN_ALLOC_TYPE)
@@ -338,16 +283,16 @@
         } \
     }
 
-#define HASH_TABLE_ITER_TYPENAME COLN_CAT(HASH_TABLE_TYPENAME, _iterator)
+#define HASH_TABLE_ITER_TYPENAME COLN_CAT(HASH_TABLE_TYPENAME, _iter)
 #define HASH_TABLE_ITER_DEFN \
     typedef struct HASH_TABLE_ITER_TYPENAME \
     { \
-        HASH_TABLE_ENTRY_TYPENAME *end_invalid; \
-        HASH_TABLE_ENTRY_TYPENAME *cur; \
+        COLN_DATA_TYPENAME *end_invalid; \
+        COLN_DATA_TYPENAME *cur; \
     } HASH_TABLE_ITER_TYPENAME;
 
 #define HASH_TABLE_ITER_INIT_SIGN \
-    void COLN_CAT(HASH_TABLE_ITER_TYPENAME, _init)( \
+    bool COLN_CAT(HASH_TABLE_ITER_TYPENAME, _init)( \
         HASH_TABLE_TYPENAME *hash_table, \
         HASH_TABLE_ITER_TYPENAME *to_init)
 #define HASH_TABLE_ITER_INIT_DEFN \
@@ -355,13 +300,15 @@
     { \
         assert(hash_table); \
         assert(to_init); \
-        to_init->end_invalid = hash_table->entries + hash_table->cap; \
-        to_init->cur = hash_table->entries; \
+        to_init->end_invalid = \
+            &((hash_table->entries + hash_table->cap)->data); \
+        to_init->cur = &(hash_table->entries[-1].data); \
+        return HASH_TABLE_ITER_NEXT_FNNAME(to_init); \
     }
 
+#define HASH_TABLE_ITER_NEXT_FNNAME COLN_CAT(HASH_TABLE_ITER_TYPENAME, _next) 
 #define HASH_TABLE_ITER_NEXT_SIGN \
-    bool COLN_CAT(HASH_TABLE_ITER_TYPENAME, _next)( \
-        HASH_TABLE_ITER_TYPENAME *iter)
+    bool HASH_TABLE_ITER_NEXT_FNNAME(HASH_TABLE_ITER_TYPENAME *iter)
 #define HASH_TABLE_ITER_NEXT_DEFN \
     HASH_TABLE_ITER_NEXT_SIGN \
     { \
@@ -369,9 +316,14 @@
         assert(iter->cur != iter->end_invalid); \
         while(true) \
         { \
-            iter->cur++; \
+            iter->cur = (COLN_DATA_TYPENAME *) \
+                ((uint8_t *)(iter->cur) + sizeof(HASH_TABLE_ENTRY_TYPENAME)); \
             if(iter->cur == iter->end_invalid) return false; \
-            if(iter->cur->probe_seq_len >= 0) return true; \
+            int cur_probe_seq_len = ((HASH_TABLE_ENTRY_TYPENAME *) \
+                ((uint8_t *)(iter->cur) - \
+                    offsetof(HASH_TABLE_ENTRY_TYPENAME, data)) \
+                )->probe_seq_len; \
+            if(cur_probe_seq_len >= 0) return true; \
         } \
     }
 
@@ -523,3 +475,62 @@ HASH_TABLE__PRIV__HAS_SLOT_DEFN
 #undef IS_POW_2
 #undef COLN_ALIGN
 #endif
+
+#undef HASH_TABLE__PRIV__HAS_SLOT_DEFN
+#undef HASH_TABLE__PRIV__HAS_SLOT_DECL
+#undef HASH_TABLE__PRIV__HAS_SLOT_SIGN
+#undef HASH_TABLE__PRIV__HAS_SLOT_INVOC
+#undef HASH_TABLE__PRIV__HAS_SLOT_FNNAME
+#undef HASH_TABLE__PRIV__INTERNAL_INSERT_DEFN
+#undef HASH_TABLE__PRIV__INTERNAL_INSERT_SIGN
+#undef HASH_TABLE__PRIV__INTERNAL_INSERT_FNNAME
+#undef HASH_TABLE__PRIV__EXPAND_DEFN
+#undef HASH_TABLE__PRIV__EXPAND_SIGN
+#undef HASH_TABLE__PRIV__EXPAND_FNNAME
+#undef HASH_TABLE_ITER_NEXT_DEFN
+#undef HASH_TABLE_ITER_NEXT_SIGN
+#undef HASH_TABLE_ITER_NEXT_FNNAME
+#undef HASH_TABLE_ITER_INIT_DEFN
+#undef HASH_TABLE_ITER_INIT_SIGN
+#undef HASH_TABLE_ITER_DEFN
+#undef HASH_TABLE_ITER_TYPENAME
+#undef HASH_TABLE_FOR_EACH_DEFN
+#undef HASH_TABLE_FOR_EACH_SIGN
+#undef HASH_TABLE_REMOVE_DEFN
+#undef HASH_TABLE_REMOVE_SIGN
+#undef HASH_TABLE_SEARCH_DEFN
+#undef HASH_TABLE_SEARCH_SIGN
+#undef HASH_TABLE_INSERT_DEFN
+#undef HASH_TABLE_INSERT_SIGN
+#undef HASH_TABLE_CLEAR_DEFN
+#undef HASH_TABLE_CLEAR_SIGN
+#undef HASH_TABLE_COPY_DEFN
+#undef HASH_TABLE_COPY_SIGN
+#undef HASH_TABLE_INIT_DEFN
+#undef HASH_TABLE_INIT_SIGN
+#undef HASH_TABLE_ENTRY_DEFN
+#undef HASH_TABLE_ENTRY_DECL
+#undef HASH_TABLE_ENTRY_TYPENAME
+#undef HASH_TABLE_DEFN
+#undef HASH_TABLE_TYPENAME
+#undef HASH_TABLE_MAX_LOAD_FACTOR
+#undef COLN_ALLOC_INTERNAL_ASSERT
+#undef COLN_INTERNAL_ASSERT
+#undef COLN_INTERNAL_DEBUG
+#undef COLN_FREE
+#undef COLN_ALLOC
+#undef COLN_ALLOC_ASSERT
+#undef COLN_ALLOC_ASSIGN
+#undef COLN_ALLOC_ARG
+#undef COLN_ALLOC_DECL
+#undef COLN_ALLOC_TYPE
+#undef COLN_DATA_SWAP
+#undef COLN_DATA_CLEAR
+#undef COLN_DATA_MOVE
+#undef COLN_DATA_COPY
+#undef COLN_DATA_HASH
+#undef COLN_DATA_TYPENAME
+#undef COLN_IMPL
+#undef COLN_HEADER
+#undef COLN_CAT
+#undef COLN_CAT_

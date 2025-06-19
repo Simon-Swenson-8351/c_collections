@@ -16,18 +16,37 @@
 
 static void print_table(int_hash_table *iht);
 
+static void test_random(void);
+static void test_iterator(void);
+static void test_for_each(void);
+typedef struct test_for_each_closure
+{
+    int total;
+    int seen_count[64];
+} test_for_each_closure;
+static void test_for_each_fn(void *closure, int *element);
+
 int main(int argc, char **argv)
 {
-#define MAX_ELEM 4096
     (void)argc;
     (void)argv;
+    test_random();
+    test_iterator();
+    test_for_each();
+    return 0;
+}
+
+static void test_random(void)
+{
+#define MAX_ELEM 4096
+#define NUM_ITERS 10000
     int_hash_table iht;
     assert(!int_hash_table_init(&iht, 0));
     static int elem_counts[MAX_ELEM] = {0};
     srand(42);
     // print_table(&iht);
     int iter = 0;
-    while(true)
+    for(int iter = 0; iter > NUM_ITERS; iter++)
     {
         // char c;
         // while((c = getchar()) != '\n') {}
@@ -92,10 +111,72 @@ int main(int argc, char **argv)
         // print_table(&iht);
         iter++;
 loop_end:
+        ;
     }
     int_hash_table_clear(&iht);
-    return 0;
+#undef NUM_ITERS
 #undef MAX_ELEM
+}
+
+static void test_iterator(void)
+{
+    int_hash_table iht;
+    assert(!int_hash_table_init(&iht, 5));
+    int elements[] = { 1, 33, 5, 6, 7, 16, 48, 28, 29, 31, 33 };
+    // When writing this test, we don't want to make any assumptions as to the 
+    // internal order of the elements, so we just tally how many we've seen to 
+    // check for consistency.
+    int should_see_count[64] = { 0 };
+    for(intptr_t i = 0; i < (intptr_t)(sizeof(elements)/sizeof(elements[0])); i++)
+        should_see_count[elements[i]]++;
+    for(intptr_t i = 0; i < (intptr_t)(sizeof(elements)/sizeof(elements[0])); i++)
+        assert(!int_hash_table_insert(&iht, elements + i));
+    print_table(&iht);
+    int_hash_table_iter iter;
+    assert(int_hash_table_iter_init(&iht, &iter));
+    int seen_count[64] = { 0 };
+    for(intptr_t i = 0; i < (intptr_t)(sizeof(elements)/sizeof(elements[0])); i++)
+    {
+        seen_count[*(iter.cur)]++;
+        bool has_cur = int_hash_table_iter_next(&iter);
+        if(i == sizeof(elements)/sizeof(elements[0]) - 1) assert(!has_cur);
+        else assert(has_cur);
+    }
+    for(intptr_t i = 0; i < (intptr_t)(sizeof(seen_count)/sizeof(seen_count[0])); i++)
+        assert(seen_count[i] == should_see_count[i]);
+    int_hash_table_clear(&iht);
+    int_hash_table_init(&iht, 6);
+    assert(!int_hash_table_iter_init(&iht, &iter));
+    int_hash_table_clear(&iht);
+}
+
+static void test_for_each(void)
+{
+    test_for_each_closure cl = { .total = 0, .seen_count = { 0 } };
+    int_hash_table iht;
+    assert(!int_hash_table_init(&iht, 5));
+    int elements[] = { 1, 33, 5, 6, 7, 16, 48, 28, 29, 31, 33 };
+    // When writing this test, we don't want to make any assumptions as to the 
+    // internal order of the elements, so we just tally how many we've seen to 
+    // check for consistency.
+    int should_see_count[64] = { 0 };
+    for(intptr_t i = 0; i < (intptr_t)(sizeof(elements)/sizeof(elements[0])); i++)
+        should_see_count[elements[i]]++;
+    for(intptr_t i = 0; i < (intptr_t)(sizeof(elements)/sizeof(elements[0])); i++)
+        assert(!int_hash_table_insert(&iht, elements + i));
+    print_table(&iht);
+    int_hash_table_for_each(&iht, &cl, test_for_each_fn);
+    assert(cl.total == 237);
+    for(intptr_t i = 0; i < (intptr_t)(sizeof(should_see_count)/sizeof(should_see_count[0])); i++)
+        assert(cl.seen_count[i] == should_see_count[i]);
+    int_hash_table_clear(&iht);
+}
+
+static void test_for_each_fn(void *closure, int *element)
+{
+    test_for_each_closure *clcast = (test_for_each_closure *)closure;
+    clcast->total += *element;
+    clcast->seen_count[*element]++;
 }
 
 static void print_table(int_hash_table *iht)
