@@ -51,6 +51,12 @@ struct col_elem_metadata
     size_t              alignment; ///< required, must be > 0
 };
 
+extern struct col_elem_metadata const col_elem_metadata_int;
+extern struct col_elem_metadata const col_elem_metadata_uint;
+extern struct col_elem_metadata const col_elem_metadata_float;
+extern struct col_elem_metadata const col_elem_metadata_double;
+extern struct col_elem_metadata const col_elem_metadata_ptr;
+
 /**
  * Copies an element from src to dest using the given metadata struct
  * 

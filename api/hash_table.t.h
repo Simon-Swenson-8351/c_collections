@@ -239,8 +239,8 @@
     { \
         assert(hash_table); \
         assert(to_insert); \
-        float load_factor = (float)(hash_table->cap) / \
-            (float)(hash_table->count + 1); \
+        float load_factor = (float)(hash_table->count + 1) / \
+            (float)(hash_table->cap); \
         if((load_factor > HASH_TABLE_MAX_LOAD_FACTOR) && \
                 !HASH_TABLE__PRIV__EXPAND_FNNAME(hash_table)) \
             return COLN_RESULT_ALLOC_FAILED; \
@@ -387,6 +387,8 @@
             to_expand->allocator, \
             sizeof(HASH_TABLE_ENTRY_TYPENAME) * new_cap); \
         if(!new_entries) return false; \
+        for(intptr_t i = 0; i < (intptr_t)new_cap; i++) \
+            new_entries[i].probe_seq_len = -1; \
         int max_probe_seq_len = 0; \
         for(intptr_t i = 0; i < (intptr_t)(to_expand->cap); i++) \
         { \
@@ -420,8 +422,8 @@
         COLN_INTERNAL_ASSERT(entries); \
         COLN_INTERNAL_ASSERT(IS_POW_2(cap)); \
         COLN_INTERNAL_ASSERT(to_insert); \
-        COLN_INTERNAL_ASSERT(HASH_TABLE__PRIV__HAS_SLOT_FNNAME(entries, \
-                                                               cap)); \
+        COLN_INTERNAL_ASSERT(HASH_TABLE__PRIV__HAS_SLOT_INVOC(entries, \
+                                                              cap)); \
         size_t mod_mask = cap - 1; \
         int misses = 0; \
         int result = 0; \
@@ -461,6 +463,8 @@
 #ifdef COLN_INTERAL_DEBUG
 #define HASH_TABLE__PRIV__HAS_SLOT_FNNAME COLN_CAT(HASH_TABLE_TYPENAME, \
                                                    _has_slot)
+#define HASH_TABLE__PRIV__HAS_SLOT_INVOC(entries, cap) \
+    HASH_TABLE__PRIV__HAS_SLOT_FNNAME((entries), (cap))
 #define HASH_TABLE__PRIV__HAS_SLOT_SIGN \
     static bool HASH_TABLE__PRIV__HAS_SLOT_FNNAME( \
         HASH_TABLE_ENTRY_TYPENAME *entries, \
@@ -474,7 +478,8 @@
         return false; \
     }
 #else
-#define HASH_TABLE__PRIV__HAS_SLOT_FNNAME true
+#define HASH_TABLE__PRIV__HAS_SLOT_FNNAME
+#define HASH_TABLE__PRIV__HAS_SLOT_INVOC(entries, cap) true
 #define HASH_TABLE__PRIV__HAS_SLOT_SIGN
 #define HASH_TABLE__PRIV__HAS_SLOT_DECL
 #define HASH_TABLE__PRIV__HAS_SLOT_DEFN

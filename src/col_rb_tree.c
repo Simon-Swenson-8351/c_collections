@@ -79,6 +79,10 @@ static void rotate_from_lr(struct col_rb_tree_node **accessor);
  */
 static void rotate_from_rl(struct col_rb_tree_node **accessor);
 
+static bool node_for_each_in_order(struct col_rb_tree_node *n, struct col_elem_metadata *md, void *context, bool(*operator)(void *context, void *element));
+static bool node_for_each_pre_order(struct col_rb_tree_node *n, struct col_elem_metadata *md, void *context, bool(*operator)(void *context, void *element));
+static bool node_for_each_post_order(struct col_rb_tree_node *n, struct col_elem_metadata *md, void *context, bool(*operator)(void *context, void *element));
+
 enum col_result
 col_rb_tree_init(
     struct col_rb_tree *to_init,
@@ -251,6 +255,36 @@ col_rb_tree_remove(
 
     col_allocator_free(self->allocator, to_remove);
     return COL_RESULT_SUCCESS;
+}
+
+enum col_result
+col_rb_tree_for_each_in_order(
+    struct col_rb_tree *self,
+    void *context,
+    bool (*operator)(void *context, void *element)
+)
+{
+
+}
+
+enum col_result
+col_rb_tree_for_each_pre_order(
+    struct col_rb_tree *self,
+    void *context,
+    bool (*operator)(void *context, void *element)
+)
+{
+
+}
+
+enum col_result
+col_rb_tree_for_each_post_order(
+    struct col_rb_tree *self,
+    void *context,
+    bool (*operator)(void *context, void *element)
+)
+{
+
 }
 
 static void node_clear(struct col_allocator *allocator, struct col_elem_metadata *md, struct col_rb_tree_node *to_clear)
@@ -484,4 +518,31 @@ static struct col_rb_tree_node **accessor(struct col_rb_tree *tree, struct col_r
     if(!(node->parent)) return &(tree->root);
     else if(LEFT_CHILD(node->parent) == node) return &LEFT_CHILD(node->parent);
     else return &RIGHT_CHILD(node->parent);
+}
+
+static bool node_for_each_in_order(struct col_rb_tree_node *n, struct col_elem_metadata *md, void *context, bool(*operator)(void *context, void *element))
+{
+    if(!n) return true;
+    if(!node_for_each_in_order(LEFT_CHILD(n), md, context, operator)) return false;
+    if(!operator(context, node_data(n, md))) return false;
+    if(!node_for_each_in_order(RIGHT_CHILD(n), md, context, operator)) return false;
+    return true;
+}
+
+static bool node_for_each_pre_order(struct col_rb_tree_node *n, struct col_elem_metadata *md, void *context, bool(*operator)(void *context, void *element))
+{
+    if(!n) return true;
+    if(!operator(context, node_data(n, md))) return false;
+    if(!node_for_each_pre_order(LEFT_CHILD(n), md, context, operator)) return false;
+    if(!node_for_each_pre_order(RIGHT_CHILD(n), md, context, operator)) return false;
+    return true;
+}
+
+static bool node_for_each_post_order(struct col_rb_tree_node *n, struct col_elem_metadata *md, void *context, bool(*operator)(void *context, void *element))
+{
+    if(!n) return true;
+    if(!node_for_each_post_order(LEFT_CHILD(n), md, context, operator)) return false;
+    if(!node_for_each_post_order(RIGHT_CHILD(n), md, context, operator)) return false;
+    if(!operator(context, node_data(n, md))) return false;
+    return true;
 }
