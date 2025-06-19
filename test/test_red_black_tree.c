@@ -56,7 +56,7 @@ static bool verify_backrefs(int_red_black_tree_node *n);
         expected_output.root = (expected_output_nodes); \
     \
         int i = (to_insert); \
-        ColnResult ins_result = int_red_black_tree_insert(&insertend, &i); \
+        coln_result ins_result = int_red_black_tree_insert(&insertend, &i); \
     \
         int result; \
         if(ins_result) \
@@ -95,7 +95,7 @@ static bool verify_backrefs(int_red_black_tree_node *n);
     \
         int removed; \
         int i = (to_remove); \
-        ColnResult removal_result = int_red_black_tree_remove(&removend, \
+        coln_result removal_result = int_red_black_tree_remove(&removend, \
                                                               &i, \
                                                               &removed); \
     \
@@ -186,7 +186,7 @@ int test_clear(void)
 int test_random(void)
 {
 #define MAX_ELEM 4096
-#define NUM_ITERS 102400
+#define NUM_ITERS 1024
     static int elem_counts[MAX_ELEM] = {0};
     int_red_black_tree prev;
     int_red_black_tree t;

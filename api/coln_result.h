@@ -3,7 +3,7 @@
 #include <inttypes.h>
 #include <stddef.h>
 
-typedef enum ColnResult
+typedef enum coln_result
 {
     COLN_RESULT_SUCCESS,
     COLN_RESULT_ALLOC_FAILED,
@@ -11,4 +11,4 @@ typedef enum ColnResult
     COLN_RESULT_ELEM_NOT_FOUND,
 
     COL_RESULT__LEN
-} ColnResult;
+} coln_result;

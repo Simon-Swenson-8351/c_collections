@@ -168,14 +168,14 @@
     }
 
 #define RED_BLACK_TREE_COPY_DECL \
-    ColnResult COLN_CAT(COLN_TYPE, _copy)(COLN_TYPE *dest, COLN_TYPE *src)
+    coln_result COLN_CAT(COLN_TYPE, _copy)(COLN_TYPE *dest, COLN_TYPE *src)
 #define RED_BLACK_TREE_COPY_DEFN \
     RED_BLACK_TREE_COPY_DECL \
     { \
         assert(dest); \
         assert(src); \
         COLN_ALLOC_ASSIGN(dest->allocator, src->allocator); \
-        ColnResult result; \
+        coln_result result; \
         RED_BLACK_NODE *new_node; \
         if((result = RED_BLACK_NODE__PRIV__COPY_INVOC(&new_node, \
                                                       src->root, \
@@ -195,7 +195,7 @@
     }
 
 #define RED_BLACK_TREE_INSERT_DECL \
-    ColnResult COLN_CAT(COLN_TYPE, _insert)(COLN_TYPE *self, \
+    coln_result COLN_CAT(COLN_TYPE, _insert)(COLN_TYPE *self, \
                                             COLN_DATA_TYPE *to_insert)
 #define RED_BLACK_TREE_INSERT_DEFN \
     RED_BLACK_TREE_INSERT_DECL \
@@ -246,7 +246,7 @@
     }
 
 #define RED_BLACK_TREE_REMOVE_DECL \
-    ColnResult COLN_CAT(COLN_TYPE, _remove)(COLN_TYPE *self, \
+    coln_result COLN_CAT(COLN_TYPE, _remove)(COLN_TYPE *self, \
                                             COLN_DATA_TYPE *elem_to_remove, \
                                             COLN_DATA_TYPE *removed_elem)
 #define RED_BLACK_TREE_REMOVE_DEFN \
@@ -347,7 +347,7 @@
     RED_BLACK_NODE__PRIV__COPY(new_dest, src) 
 #endif
 #define RED_BLACK_NODE__PRIV__COPY_DECL \
-    static ColnResult RED_BLACK_NODE__PRIV__COPY( \
+    static coln_result RED_BLACK_NODE__PRIV__COPY( \
         RED_BLACK_NODE **new_dest, \
         RED_BLACK_NODE *src \
         COLN_ALLOC_ARG(allocator))
@@ -362,7 +362,7 @@
             *new_dest = NULL; \
             return COLN_RESULT_SUCCESS; \
         } \
-        ColnResult result; \
+        coln_result result; \
         *new_dest = COLN_ALLOC(allocator, sizeof(RED_BLACK_NODE)); \
         if(!(*new_dest)) \
         { \

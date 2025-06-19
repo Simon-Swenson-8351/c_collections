@@ -126,7 +126,7 @@
     } COLN_TYPE;
 
 #define ARRAY_LIST_INIT_DECL \
-    ColnResult COLN_CAT(COLN_TYPE, _init)(COLN_TYPE *to_init, \
+    coln_result COLN_CAT(COLN_TYPE, _init)(COLN_TYPE *to_init, \
                                   COLN_ALLOC_ARG(allocator) \
                                   unsigned int initial_cap_exp)
 #define ARRAY_LIST_INIT_DEFN \
@@ -145,7 +145,7 @@
     }
 
 #define ARRAY_LIST_COPY_DECL \
-    ColnResult COLN_CAT(COLN_TYPE, _copy)(COLN_TYPE *dest, COLN_TYPE *src)
+    coln_result COLN_CAT(COLN_TYPE, _copy)(COLN_TYPE *dest, COLN_TYPE *src)
 #define ARRAY_LIST_COPY_DEFN \
     ARRAY_LIST_COPY_DECL \
     { \
@@ -156,7 +156,7 @@
         if(!dest->data) return COLN_RESULT_ALLOC_FAILED; \
         if(!COLN_DATA_COPY_MANY(dest->data, src->data, src->len)) \
         { \
-            COLN_FREE(dest->data);
+            COLN_FREE(src->allocator, dest->data); \
             return COLN_RESULT_COPY_ELEM_FAILED; \
         } \
         COLN_ALLOC_ASSIGN(dest->allocator, src->allocator); \
@@ -175,14 +175,14 @@
     }
 
 #define ARRAY_LIST_PUSH_BACK_DECL \
-    ColnResult COLN_CAT(COLN_TYPE, _push_back)(COLN_TYPE *self, \
+    coln_result COLN_CAT(COLN_TYPE, _push_back)(COLN_TYPE *self, \
                                        COLN_DATA_TYPE *to_insert)
 #define ARRAY_LIST_PUSH_BACK_DEFN \
     ARRAY_LIST_PUSH_BACK_DECL \
     { \
         assert(self); \
         assert(to_insert); \
-        ColnResult result; \
+        coln_result result; \
         if(self->len == self->cap && (result = ARRAY_LIST__PRIV__EXPAND(self))) return result; \
         COLN_DATA_MOVE(self->data + self->len, to_insert); \
         self->len++; \
@@ -190,7 +190,7 @@
     }
 
 #define ARRAY_LIST_INSERT_AT_DECL \
-    ColnResult COLN_CAT(COLN_TYPE, _insert_at)(COLN_TYPE *self, \
+    coln_result COLN_CAT(COLN_TYPE, _insert_at)(COLN_TYPE *self, \
                                        COLN_DATA_TYPE *to_insert, \
                                        ptrdiff_t index)
 #define ARRAY_LIST_INSERT_AT_DEFN \
@@ -199,7 +199,7 @@
         assert(self); \
         assert(to_insert); \
         assert(index <= (ptrdiff_t)self->len); \
-        ColnResult result; \
+        coln_result result; \
         if(self->len == self->cap && (result = ARRAY_LIST__PRIV__EXPAND(self))) return result; \
         for(ptrdiff_t i = self->len; i > index; i--) \
             COLN_DATA_MOVE(self->data + i, self->data + (i - 1)); \
@@ -238,7 +238,8 @@
     }
 
 #define ARRAY_LIST_CONCATENATE_DECL \
-    ColnResult COLN_CAT(COLN_TYPE, _concatenate)(COLN_TYPE *first, COLN_TYPE *second)
+    coln_result COLN_CAT(COLN_TYPE, _concatenate)(COLN_TYPE *first, \
+                                                  COLN_TYPE *second)
 #define ARRAY_LIST_CONCATENATE_DEFN \
     ARRAY_LIST_CONCATENATE_DECL \
     { \
@@ -266,7 +267,7 @@
 
 #define ARRAY_LIST__PRIV__EXPAND COLN_CAT(COLN_TYPE, _expand)
 #define ARRAY_LIST__PRIV__EXPAND_DECL \
-    static ColnResult ARRAY_LIST__PRIV__EXPAND(COLN_TYPE *to_expand)
+    static coln_result ARRAY_LIST__PRIV__EXPAND(COLN_TYPE *to_expand)
 #define ARRAY_LIST__PRIV__EXPAND_DEFN \
     ARRAY_LIST__PRIV__EXPAND_DECL \
     { \

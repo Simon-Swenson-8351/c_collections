@@ -103,7 +103,7 @@
     } HASH_TABLE_ENTRY_TYPENAME;
 
 #define HASH_TABLE_INIT_SIGN \
-    ColnResult COLN_CAT(HASH_TABLE_TYPENAME, _init)( \
+    coln_result COLN_CAT(HASH_TABLE_TYPENAME, _init)( \
         HASH_TABLE_TYPENAME *to_init \
         COLN_ALLOC_ARG(allocator), \
         int initial_cap_exp)
@@ -127,7 +127,7 @@
     }
 
 #define HASH_TABLE_COPY_SIGN \
-    ColnResult COLN_CAT(HASH_TABLE_TYPENAME, _copy)(HASH_TABLE_TYPENAME *dest, \
+    coln_result COLN_CAT(HASH_TABLE_TYPENAME, _copy)(HASH_TABLE_TYPENAME *dest, \
                                                     HASH_TABLE_TYPENAME *src)
 #define HASH_TABLE_COPY_DEFN \
     HASH_TABLE_COPY_SIGN \
@@ -176,7 +176,7 @@
     }
 
 #define HASH_TABLE_INSERT_SIGN \
-    ColnResult COLN_CAT(HASH_TABLE_TYPENAME, _insert)( \
+    coln_result COLN_CAT(HASH_TABLE_TYPENAME, _insert)( \
         HASH_TABLE_TYPENAME *hash_table, \
         COLN_DATA_TYPENAME *to_insert)
 #define HASH_TABLE_INSERT_DEFN \
@@ -226,7 +226,7 @@
     }
 
 #define HASH_TABLE_REMOVE_SIGN \
-    ColnResult COLN_CAT(HASH_TABLE_TYPENAME, _remove)( \
+    coln_result COLN_CAT(HASH_TABLE_TYPENAME, _remove)( \
         HASH_TABLE_TYPENAME *hash_table, \
         COLN_DATA_TYPENAME *to_remove, \
         COLN_DATA_TYPENAME *removed)
