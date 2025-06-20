@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -140,13 +141,13 @@
 #define RED_BLACK_NODE_DECL \
     typedef struct RED_BLACK_NODE RED_BLACK_NODE
 #define RED_BLACK_NODE_DEFN \
-    typedef struct RED_BLACK_NODE \
+    struct RED_BLACK_NODE \
     { \
         struct RED_BLACK_NODE *parent; \
         struct RED_BLACK_NODE *children[2]; \
         NodeColor color; \
         COLN_DATA_TYPE data; \
-    } RED_BLACK_NODE;
+    };
 
 #define RED_BLACK_TREE_STRUCT_DEFN \
     typedef struct COLN_TYPE \

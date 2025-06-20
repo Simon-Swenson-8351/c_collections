@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 #include "coln_result.h"
@@ -95,12 +96,12 @@
 #define HASH_TABLE_ENTRY_DECL \
     typedef struct HASH_TABLE_ENTRY_TYPENAME HASH_TABLE_ENTRY_TYPENAME;
 #define HASH_TABLE_ENTRY_DEFN \
-    typedef struct HASH_TABLE_ENTRY_TYPENAME \
+    struct HASH_TABLE_ENTRY_TYPENAME \
     { \
         size_t hash; \
         int probe_seq_len; \
         COLN_DATA_TYPENAME data; \
-    } HASH_TABLE_ENTRY_TYPENAME;
+    };
 
 #define HASH_TABLE_INIT_SIGN \
     coln_result COLN_CAT(HASH_TABLE_TYPENAME, _init)( \
@@ -118,7 +119,7 @@
                 allocator, \
                 sizeof(HASH_TABLE_ENTRY_TYPENAME) * to_init->cap))) \
             return COLN_RESULT_ALLOC_FAILED; \
-        for(intptr_t i = 0; i < (intptr_t)to_init->cap; i++) \
+        for(ptrdiff_t i = 0; i < (ptrdiff_t)to_init->cap; i++) \
             to_init->entries[i].probe_seq_len = -1; \
         COLN_ALLOC_ASSIGN(to_init->allocator, allocator); \
         to_init->count = 0; \
@@ -165,7 +166,7 @@
     HASH_TABLE_CLEAR_SIGN \
     { \
         assert(to_clear); \
-        for(intptr_t i = 0; i < (intptr_t)to_clear->cap; i++) \
+        for(ptrdiff_t i = 0; i < (ptrdiff_t)to_clear->cap; i++) \
         { \
             if(to_clear->entries[i].probe_seq_len >= 0) \
             { \
@@ -274,7 +275,7 @@
 #define HASH_TABLE_FOR_EACH_DEFN \
     HASH_TABLE_FOR_EACH_SIGN \
     { \
-        for(intptr_t i = 0; i < (intptr_t)hash_table->cap; i++) \
+        for(ptrdiff_t i = 0; i < (ptrdiff_t)hash_table->cap; i++) \
         { \
             if(hash_table->entries[i].probe_seq_len < 0) continue; \
             lambda(capture, &(hash_table->entries[i].data)); \
@@ -315,10 +316,11 @@
         while(true) \
         { \
             iter->cur = (COLN_DATA_TYPENAME *) \
-                ((uint8_t *)(iter->cur) + sizeof(HASH_TABLE_ENTRY_TYPENAME)); \
+                ((unsigned char *)(iter->cur) + \
+                    sizeof(HASH_TABLE_ENTRY_TYPENAME)); \
             if(iter->cur == iter->end_invalid) return false; \
             int cur_probe_seq_len = ((HASH_TABLE_ENTRY_TYPENAME *) \
-                ((uint8_t *)(iter->cur) - \
+                ((unsigned char *)(iter->cur) - \
                     offsetof(HASH_TABLE_ENTRY_TYPENAME, data)) \
                 )->probe_seq_len; \
             if(cur_probe_seq_len >= 0) return true; \
@@ -337,10 +339,10 @@
             to_expand->allocator, \
             sizeof(HASH_TABLE_ENTRY_TYPENAME) * new_cap); \
         if(!new_entries) return false; \
-        for(intptr_t i = 0; i < (intptr_t)new_cap; i++) \
+        for(ptrdiff_t i = 0; i < (ptrdiff_t)new_cap; i++) \
             new_entries[i].probe_seq_len = -1; \
         int max_probe_seq_len = 0; \
-        for(intptr_t i = 0; i < (intptr_t)(to_expand->cap); i++) \
+        for(ptrdiff_t i = 0; i < (ptrdiff_t)(to_expand->cap); i++) \
         { \
             if(to_expand->entries[i].probe_seq_len < 0) continue; \
             int ins_probe_seq_len = HASH_TABLE__PRIV__INTERNAL_INSERT_FNNAME( \
