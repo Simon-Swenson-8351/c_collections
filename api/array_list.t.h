@@ -9,7 +9,7 @@
 #define COLN_CAT_(a, b) a ## b
 #define COLN_CAT(a, b) COLN_CAT_(a, b)
 
-#ifdef COLN_INTERNAL_DEBUG
+#ifndef COLN_INTERNAL_NDEBUG
   #define COLN_INTERNAL_ASSERT(x) assert(x)
 #else
   #define COLN_INTERNAL_ASSERT(x)
@@ -83,30 +83,39 @@
 #ifdef COLN_DATA_TRIVIAL_BY_VAL
   #define COLN_DATA_ARG(arg_name) COLN_DATA_TYPENAME arg_name
   #define COLN_DATA_ASSERT_ARG(arg_name)
+  #define COLN_DATA_RESULT_DECL_WRAPPER(result) COLN_DATA_TYPENAME result
+  #define COLN_DATA_RESULT_RETURN_WRAPPER(result) return (result)
 #else
-  #define COLN_DATA_ARG(arg_name) COLN_DATA_TYPENAME arg_name
+  #define COLN_DATA_ARG(arg_name) COLN_DATA_TYPENAME *arg_name
   #define COLN_DATA_ASSERT_ARG(arg_name) assert(arg_name)
+  #define COLN_DATA_RESULT_DECL_WRAPPER(result)
+  #define COLN_DATA_RESULT_RETURN_WRAPPER(result)
 #endif
 
 #if defined(COLN_DATA_TRIVIAL_BY_VAL)
   #define COLN_DATA_MOVE_PTR_FROM_ARG_WRAPPER(ptr, arg) (*(ptr) = arg)
+  #define COLN_DATA_RESULT_ASSIGN_WRAPPER(result, ptr) ((result) = *(ptr))
 #elif defined(COLN_DATA_TRIVIAL_BY_PTR)
   #define COLN_DATA_MOVE_PTR_FROM_ARG_WRAPPER(ptr, arg) (*(ptr) = *(arg))
+  #define COLN_DATA_RESULT_ASSIGN_WRAPPER(result, ptr) (*(result) = *(ptr))
 #elif defined(COLN_DATA_NONTRIVIAL_BY_PTR)
   #define COLN_DATA_MOVE_PTR_FROM_ARG_WRAPPER(ptr, arg) \
     COLN_DATA_MOVE((ptr), (arg))
+  #define COLN_DATA_RESULT_ASSIGN_WRAPPER(result, ptr) \
+    COLN_DATA_MOVE((result), (ptr))
 #endif
 
 #if !defined(COLN_DATA_NONTRIVIAL_BY_PTR)
   #define COLN_DATA_MOVE_PTR_FROM_PTR_WRAPPER(dest, src) (*(dest) = *(src))
-  #define COLN_DATA_MOVE_MANY(dest_ptr, src_ptr, len) memcpy((dest_ptr), (src_ptr), (len))
+  #define COLN_DATA_MOVE_MANY(dest_ptr, src_ptr, len) \
+    memcpy((dest_ptr), (src_ptr), sizeof(COLN_DATA_TYPENAME) * (len))
   #define COLN_DATA_CLEAR_MANY(to_clear_ptr, len)
 #else
   #define COLN_DATA_MOVE_PTR_FROM_PTR_WRAPPER(dest, src) COLN_DATA_MOVE(dest, src)
   #define COLN_DATA_MOVE_MANY(dest_ptr, src_ptr, len) \
     do \
     { \
-      for(ptrdiff_t i = 0; i < (count); i++) \
+      for(size_t i = 0; i < (len); i++) \
       { \
         COLN_DATA_MOVE((dest_ptr) + i, (src_ptr) + i); \
       } \
@@ -114,7 +123,7 @@
   #define COLN_DATA_CLEAR_MANY(to_clear_ptr, len) \
     do \
     { \
-      for(ptrdiff_t i = 0; i < (ptrdiff_t)len; i++) \
+      for(size_t i = 0; i < (len); i++) \
       { \
         COLN_DATA_CLEAR((to_clear_ptr) + i); \
       } \
@@ -126,11 +135,11 @@
   #define ARRAY_LIST_COPY_DATA_SNIPPET memcpy(dest->data, src->data, sizeof(COLN_DATA_TYPENAME) * src->len);
 #elif defined(COLN_DATA_COPY)
   #define ARRAY_LIST_COPY_DATA_SNIPPET \
-    for(ptrdiff_t i = 0; i < src->len; i++) \
+    for(size_t i = 0; i < src->len; i++) \
     { \
       if(!COLN_DATA_COPY(dest->data + i, src->data + i)) \
       { \
-        for(ptrdiff_t j = i - 1; j >= 0; j--) \
+        for(ptrdiff_t j = (ptrdiff_t)(i - 1); j >= 0; j--) \
         { \
           COLN_DATA_CLEAR(dest->data + j); \
         } \
@@ -142,9 +151,9 @@
   #define ARRAY_LIST_COPY_DATA_SNIPPET
 #endif
 
-#ifdef COLN_ALLOC_TYPE
-  #define COLN_ALLOC_DECL(allocator) COLN_ALLOC_TYPE *allocator;
-  #define COLN_ALLOC_ARG(allocator) COLN_ALLOC_TYPE *allocator,
+#ifdef COLN_ALLOC_TYPENAME
+  #define COLN_ALLOC_DECL(allocator) COLN_ALLOC_TYPENAME *allocator;
+  #define COLN_ALLOC_ARG(allocator) COLN_ALLOC_TYPENAME *allocator,
   #define COLN_ALLOC_ASSIGN(lval, rval) ((lval) = (rval))
   #define COLN_ALLOC_ASSERT(expr) assert((expr))
   #ifndef COLN_ALLOC
@@ -152,6 +161,7 @@
       "type is defined."
   #endif
   #ifndef COLN_FREE
+    #define COLN_FREE_SET
     #define COLN_FREE(allocator, ptr_to_free)
   #endif
 #else
@@ -159,7 +169,9 @@
   #define COLN_ALLOC_ARG(allocator)
   #define COLN_ALLOC_ASSIGN(lval, rval)
   #define COLN_ALLOC_ASSERT(expr)
+  #define COLN_ALLOC_SET
   #define COLN_ALLOC(allocator, size_to_alloc) malloc(size_to_alloc)
+  #define COLN_FREE_SET
   #define COLN_FREE(allocator, ptr_to_free) free(ptr_to_free)
 #endif
 
@@ -182,6 +194,13 @@
     coln_result ARRAY_LIST_INIT_FNNAME(ARRAY_LIST_TYPENAME *to_init, \
                                        COLN_ALLOC_ARG(allocator) \
                                        size_t initial_cap)
+#ifdef COLN_ALLOC_TYPENAME
+  #define ARRAY_LIST_INIT_CALL(to_init, allocator, initial_cap) \
+    ARRAY_LIST_INIT_FNNAME((to_init), (allocator), (initial_cap))
+#else
+  #define ARRAY_LIST_INIT_CALL(to_init, allocator, initial_cap) \
+    ARRAY_LIST_INIT_FNNAME((to_init), (initial_cap))
+#endif
 #define ARRAY_LIST_INIT_DECL ARRAY_LIST_INIT_SIGN;
 #define ARRAY_LIST_INIT_DEFN \
     ARRAY_LIST_INIT_SIGN \
@@ -227,6 +246,20 @@
   #define ARRAY_LIST_COPY_DEFN
 #endif
 
+#define ARRAY_LIST_MOVE_FNNAME COLN_CAT(ARRAY_LIST_TYPENAME, _move)
+#define ARRAY_LIST_MOVE_SIGN \
+  void ARRAY_LIST_MOVE_FNNAME(ARRAY_LIST_TYPENAME *dest, ARRAY_LIST_TYPENAME *src)
+#define ARRAY_LIST_MOVE_CALL(dest, src) ARRAY_LIST_MOVE_FNNAME((dest), (src))
+#define ARRAY_LIST_MOVE_DECL ARRAY_LIST_MOVE_SIGN;
+#define ARRAY_LIST_MOVE_DEFN \
+  ARRAY_LIST_MOVE_SIGN \
+  { \
+    assert(dest); \
+    assert(src); \
+    *dest = *src; \
+    src->data = NULL; \
+  }
+
 #define ARRAY_LIST_CLEAR_FNNAME COLN_CAT(ARRAY_LIST_TYPENAME, _clear)
 #define ARRAY_LIST_CLEAR_SIGN \
   void ARRAY_LIST_CLEAR_FNNAME(ARRAY_LIST_TYPENAME *to_clear)
@@ -241,7 +274,7 @@
 
 #define ARRAY_LIST_PUSH_BACK_FNNAME COLN_CAT(ARRAY_LIST_TYPENAME, _push_back)
 #define ARRAY_LIST_PUSH_BACK_SIGN \
-  coln_result ARRAY_LIST_PUSH_BACK_FNNAME(ARRAY_LIST_TYPENAME *self, \
+  coln_result ARRAY_LIST_PUSH_BACK_FNNAME(ARRAY_LIST_TYPENAME *array_list, \
                                           COLN_DATA_ARG(to_insert))
 #define ARRAY_LIST_PUSH_BACK_CALL(array_list_ptr, to_insert) \
   ARRAY_LIST_PUSH_BACK_FNNAME((array_list_ptr), (to_insert))
@@ -249,35 +282,40 @@
 #define ARRAY_LIST_PUSH_BACK_DEFN \
   ARRAY_LIST_PUSH_BACK_SIGN \
   { \
-    assert(self); \
+    assert(array_list); \
     COLN_DATA_ASSERT_ARG(to_insert); \
     coln_result result; \
-    if(self->len == self->cap && (result = ARRAY_LIST__PRIV__EXPAND(self))) \
+    if(array_list->len == array_list->cap && \
+        (result = ARRAY_LIST__PRIV__EXPAND_CALL(array_list))) \
       return result; \
-    COLN_DATA_MOVE_PTR_FROM_ARG_WRAPPER(self->data + self->len, to_insert); \
-    self->len++; \
+    COLN_DATA_MOVE_PTR_FROM_ARG_WRAPPER(array_list->data + array_list->len, \
+                                        to_insert); \
+    array_list->len++; \
     return COLN_RESULT_SUCCESS; \
   }
 
 #define ARRAY_LIST_INSERT_AT_FNNAME COLN_CAT(ARRAY_LIST_TYPENAME, _insert_at)
 #define ARRAY_LIST_INSERT_AT_SIGN \
-  coln_result ARRAY_LIST_INSERT_AT_FNNAME(ARRAY_LIST_TYPENAME *self, \
+  coln_result ARRAY_LIST_INSERT_AT_FNNAME(ARRAY_LIST_TYPENAME *array_list, \
                                           COLN_DATA_ARG(to_insert), \
                                           ptrdiff_t index)
+#define ARRAY_LIST_INSERT_AT_CALL(array_list, to_insert, index) \
+  ARRAY_LIST_INSERT_AT_FNNAME((array_list), (to_insert), (index))
 #define ARRAY_LIST_INSERT_AT_DECL ARRAY_LIST_INSERT_AT_SIGN;
 #define ARRAY_LIST_INSERT_AT_DEFN \
   ARRAY_LIST_INSERT_AT_SIGN \
   { \
-    assert(self); \
+    assert(array_list); \
     COLN_DATA_ASSERT_ARG(to_insert); \
-    assert(index >= 0 && index <= (ptrdiff_t)self->len); \
+    assert(index >= 0 && index <= (ptrdiff_t)array_list->len); \
     coln_result result; \
-    if(self->len == self->cap && (result = ARRAY_LIST__PRIV__EXPAND(self))) \
+    if(array_list->len == array_list->cap && \
+        (result = ARRAY_LIST__PRIV__EXPAND_CALL(array_list))) \
       return result; \
-    for(ptrdiff_t i = self->len; i > index; i--) \
-      COLN_DATA_MOVE_PTR_FROM_PTR_WRAPPER(self->data + i, self->data + (i - 1)); \
-    COLN_DATA_MOVE_PTR_FROM_ARG_WRAPPER(self->data + index, to_insert); \
-    self->len++; \
+    for(ptrdiff_t i = array_list->len; i > index; i--) \
+      COLN_DATA_MOVE_PTR_FROM_PTR_WRAPPER(array_list->data + i, array_list->data + (i - 1)); \
+    COLN_DATA_MOVE_PTR_FROM_ARG_WRAPPER(array_list->data + index, to_insert); \
+    array_list->len++; \
     return COLN_RESULT_SUCCESS; \
   }
 
@@ -285,26 +323,14 @@
 #if defined(COLN_DATA_TRIVIAL_BY_VAL)
   #define ARRAY_LIST_POP_BACK_SIGN \
     COLN_DATA_TYPENAME ARRAY_LIST_POP_BACK_FNNAME(ARRAY_LIST_TYPENAME *array_list)
-  #define ARRAY_LIST_POP_BACK_CALL(array_list_ptr, popped) \
-    ((popped) = ARRAY_LIST_POP_BACK_FNNAME((array_list_ptr)))
-  #define ARRAY_LIST_POP_BACK_RESULT_WRAPPER(removed_ptr, popped) \
-    return *(removed_ptr)
-#elif defined(COLN_DATA_TRIVIAL_BY_PTR)
-  #define ARRAY_LIST_POP_BACK_SIGN \
-    void ARRAY_LIST_POP_BACK_FNNAME(ARRAY_LIST_TYPENAME *array_list, \
-                                    COLN_DATA_TYPENAME *popped)
-  #define ARRAY_LIST_POP_BACK_CALL(array_list_ptr, popped) \
-    ARRAY_LIST_POP_BACK_FNNAME((array_list_ptr), (popped))
-  #define ARRAY_LIST_POP_BACK_RESULT_WRAPPER(removed_ptr, popped) \
-    (*(popped) = *(removed_ptr))
+  #define ARRAY_LIST_POP_BACK_CALL(array_list_ptr, popped_ptr) \
+    (*(popped_ptr) = ARRAY_LIST_POP_BACK_FNNAME((array_list_ptr)))
 #else
   #define ARRAY_LIST_POP_BACK_SIGN \
     void ARRAY_LIST_POP_BACK_FNNAME(ARRAY_LIST_TYPENAME *array_list, \
                                     COLN_DATA_TYPENAME *popped)
-  #define ARRAY_LIST_POP_BACK_CALL(array_list_ptr, popped) \
-    ARRAY_LIST_POP_BACK_FNNAME((array_list_ptr), (popped))
-  #define ARRAY_LIST_POP_BACK_RESULT_WRAPPER(removed_ptr, popped) \
-    COLN_DATA_MOVE((popped), (removed_ptr))
+  #define ARRAY_LIST_POP_BACK_CALL(array_list_ptr, popped_ptr) \
+    ARRAY_LIST_POP_BACK_FNNAME((array_list_ptr), (popped_ptr))
 #endif
 #define ARRAY_LIST_POP_BACK_DECL ARRAY_LIST_POP_BACK_SIGN;
 #define ARRAY_LIST_POP_BACK_DEFN \
@@ -314,31 +340,55 @@
     COLN_DATA_ASSERT_ARG(popped); \
     assert(array_list->len > 0); \
     array_list->len--; \
-    ARRAY_LIST_POP_BACK_RESULT_WRAPPER(array_list->data + array_list->len, \
-                                       popped); \
+    COLN_DATA_RESULT_DECL_WRAPPER(popped); \
+    COLN_DATA_RESULT_ASSIGN_WRAPPER( \
+      popped, \
+      array_list->data + array_list->len); \
+    COLN_DATA_RESULT_RETURN_WRAPPER(popped); \
   }
 
-#define ARRAY_LIST_REMOVE_AT_DECL \
-    void COLN_CAT(ARRAY_LIST_TYPENAME, _remove_at)(ARRAY_LIST_TYPENAME *self, \
-                                 COLN_DATA_TYPENAME *removed, \
-                                 ptrdiff_t index)
+#define ARRAY_LIST_REMOVE_AT_FNNAME COLN_CAT(ARRAY_LIST_TYPENAME, _remove_at)
+#if defined(COLN_DATA_TRIVIAL_BY_VAL)
+  #define ARRAY_LIST_REMOVE_AT_SIGN \
+    COLN_DATA_TYPENAME ARRAY_LIST_REMOVE_AT_FNNAME( \
+      ARRAY_LIST_TYPENAME *array_list, \
+      ptrdiff_t index)
+  #define ARRAY_LIST_REMOVE_AT_CALL(array_list_ptr, index, popped_ptr) \
+    (*(popped_ptr) = ARRAY_LIST_REMOVE_AT_FNNAME((array_list_ptr), (index)))
+#else
+  #define ARRAY_LIST_REMOVE_AT_SIGN \
+    void ARRAY_LIST_REMOVE_AT_FNNAME(ARRAY_LIST_TYPENAME *array_list, \
+                                     ptrdiff_t index, \
+                                     COLN_DATA_TYPENAME *removed)
+  #define ARRAY_LIST_REMOVE_AT_CALL(array_list_ptr, index, popped_ptr) \
+    ARRAY_LIST_REMOVE_AT_FNNAME((array_list_ptr), (index), (popped_ptr))
+#endif
+#define ARRAY_LIST_REMOVE_AT_DECL ARRAY_LIST_REMOVE_AT_SIGN;
 #define ARRAY_LIST_REMOVE_AT_DEFN \
-    ARRAY_LIST_REMOVE_AT_DECL \
+    ARRAY_LIST_REMOVE_AT_SIGN \
     { \
-        assert(self); \
-        assert(removed); \
-        assert(index < (ptrdiff_t)self->len); \
-        COLN_DATA_MOVE(removed, self->data + index); \
-        for(ptrdiff_t i = index; i + 1 < (ptrdiff_t)self->len; i++) \
-            COLN_DATA_MOVE(self->data + i, self->data + i + 1); \
-        self->len--; \
+        assert(array_list); \
+        assert(index < (ptrdiff_t)array_list->len); \
+        assert(index >= 0); \
+        COLN_DATA_ASSERT_ARG(removed); \
+        COLN_DATA_RESULT_DECL_WRAPPER(removed); \
+        COLN_DATA_RESULT_ASSIGN_WRAPPER(removed, array_list->data + index); \
+        for(ptrdiff_t i = index; i + 1 < (ptrdiff_t)array_list->len; i++) \
+            COLN_DATA_MOVE_PTR_FROM_PTR_WRAPPER(array_list->data + i, \
+                                                array_list->data + i + 1); \
+        array_list->len--; \
+        COLN_DATA_RESULT_RETURN_WRAPPER(removed); \
     }
 
-#define ARRAY_LIST_CONCATENATE_DECL \
-    coln_result COLN_CAT(ARRAY_LIST_TYPENAME, _concatenate)(ARRAY_LIST_TYPENAME *first, \
-                                                  ARRAY_LIST_TYPENAME *second)
-#define ARRAY_LIST_CONCATENATE_DEFN \
-    ARRAY_LIST_CONCATENATE_DECL \
+#define ARRAY_LIST_CAT_FNNAME COLN_CAT(ARRAY_LIST_TYPENAME, _cat)
+#define ARRAY_LIST_CAT_SIGN \
+    coln_result ARRAY_LIST_CAT_FNNAME(ARRAY_LIST_TYPENAME *first, \
+                                      ARRAY_LIST_TYPENAME *second)
+#define ARRAY_LIST_CAT_CALL(first, second) \
+  ARRAY_LIST_CAT_FNNAME((first), (second))
+#define ARRAY_LIST_CAT_DECL ARRAY_LIST_CAT_SIGN;
+#define ARRAY_LIST_CAT_DEFN \
+    ARRAY_LIST_CAT_SIGN \
     { \
         assert(first); \
         assert(second); \
@@ -362,16 +412,21 @@
         return COLN_RESULT_SUCCESS; \
     }
 
-#define ARRAY_LIST__PRIV__EXPAND COLN_CAT(ARRAY_LIST_TYPENAME, _expand)
-#define ARRAY_LIST__PRIV__EXPAND_DECL \
-    static coln_result ARRAY_LIST__PRIV__EXPAND(ARRAY_LIST_TYPENAME *to_expand)
+#define ARRAY_LIST__PRIV__EXPAND_FNNAME COLN_CAT(ARRAY_LIST_TYPENAME, _expand)
+#define ARRAY_LIST__PRIV__EXPAND_SIGN \
+    static coln_result ARRAY_LIST__PRIV__EXPAND_FNNAME( \
+      ARRAY_LIST_TYPENAME *to_expand)
+#define ARRAY_LIST__PRIV__EXPAND_CALL(to_expand) \
+  ARRAY_LIST__PRIV__EXPAND_FNNAME((to_expand))
+#define ARRAY_LIST__PRIV__EXPAND_DECL ARRAY_LIST__PRIV__EXPAND_SIGN;
 #define ARRAY_LIST__PRIV__EXPAND_DEFN \
-    ARRAY_LIST__PRIV__EXPAND_DECL \
+    ARRAY_LIST__PRIV__EXPAND_SIGN \
     { \
         COLN_INTERNAL_ASSERT(to_expand); \
         size_t new_cap = to_expand->cap << 1; \
-        COLN_DATA_TYPENAME *new_buf = COLN_ALLOC(to_expand->allocator, \
-                                             sizeof(COLN_DATA_TYPENAME) * new_cap); \
+        COLN_DATA_TYPENAME *new_buf = COLN_ALLOC( \
+          to_expand->allocator, \
+          sizeof(COLN_DATA_TYPENAME) * new_cap); \
         if(!new_buf) return COLN_RESULT_ALLOC_FAILED; \
         COLN_DATA_MOVE_MANY(new_buf, to_expand->data, to_expand->len); \
         COLN_FREE(to_expand->allocator, to_expand->data); \
@@ -382,69 +437,112 @@
 
 #ifdef COLN_HEADER
 ARRAY_LIST_STRUCT_DEFN
-ARRAY_LIST_INIT_DECL;
-ARRAY_LIST_COPY_DECL;
-ARRAY_LIST_CLEAR_DECL;
-ARRAY_LIST_PUSH_BACK_DECL;
-ARRAY_LIST_INSERT_AT_DECL;
-ARRAY_LIST_POP_BACK_DECL;
-ARRAY_LIST_REMOVE_AT_DECL;
-ARRAY_LIST_CONCATENATE_DECL;
+ARRAY_LIST_INIT_DECL
+ARRAY_LIST_COPY_DECL
+ARRAY_LIST_MOVE_DECL
+ARRAY_LIST_CLEAR_DECL
+ARRAY_LIST_PUSH_BACK_DECL
+ARRAY_LIST_INSERT_AT_DECL
+ARRAY_LIST_POP_BACK_DECL
+ARRAY_LIST_REMOVE_AT_DECL
+ARRAY_LIST_CAT_DECL
 #endif
 
 #ifdef COLN_IMPL
-COLN_DATA__PRIV__COPY_MANY_DECLSC
-ARRAY_LIST__PRIV__EXPAND_DECL;
+ARRAY_LIST__PRIV__EXPAND_DECL
 ARRAY_LIST_INIT_DEFN
 ARRAY_LIST_COPY_DEFN
+ARRAY_LIST_MOVE_DEFN
 ARRAY_LIST_CLEAR_DEFN
 ARRAY_LIST_PUSH_BACK_DEFN
 ARRAY_LIST_INSERT_AT_DEFN
 ARRAY_LIST_POP_BACK_DEFN
 ARRAY_LIST_REMOVE_AT_DEFN
-ARRAY_LIST_CONCATENATE_DEFN
-COLN_DATA__PRIV__COPY_MANY_DEFN
+ARRAY_LIST_CAT_DEFN
 ARRAY_LIST__PRIV__EXPAND_DEFN
 #endif
 
 #undef ARRAY_LIST__PRIV__EXPAND_DEFN
 #undef ARRAY_LIST__PRIV__EXPAND_DECL
-#undef ARRAY_LIST_CONCATENATE_DEFN
-#undef ARRAY_LIST_CONCATENATE_DECL
+#undef ARRAY_LIST__PRIV__EXPAND_CALL
+#undef ARRAY_LIST__PRIV__EXPAND_SIGN
+#undef ARRAY_LIST__PRIV__EXPAND_FNNAME
+#undef ARRAY_LIST_CAT_DEFN
+#undef ARRAY_LIST_CAT_DECL
+#undef ARRAY_LIST_CAT_CALL
+#undef ARRAY_LIST_CAT_SIGN
+#undef ARRAY_LIST_CAT_FNNAME
 #undef ARRAY_LIST_REMOVE_AT_DEFN
 #undef ARRAY_LIST_REMOVE_AT_DECL
+#undef ARRAY_LIST_REMOVE_AT_CALL
+#undef ARRAY_LIST_REMOVE_AT_SIGN
+#undef ARRAY_LIST_REMOVE_AT_FNNAME
 #undef ARRAY_LIST_POP_BACK_DEFN
 #undef ARRAY_LIST_POP_BACK_DECL
+#undef ARRAY_LIST_POP_BACK_CALL
+#undef ARRAY_LIST_POP_BACK_SIGN
+#undef ARRAY_LIST_POP_BACK_FNNAME
 #undef ARRAY_LIST_INSERT_AT_DEFN
 #undef ARRAY_LIST_INSERT_AT_DECL
+#undef ARRAY_LIST_INSERT_AT_CALL
+#undef ARRAY_LIST_INSERT_AT_SIGN
+#undef ARRAY_LIST_INSERT_AT_FNNAME
 #undef ARRAY_LIST_PUSH_BACK_DEFN
 #undef ARRAY_LIST_PUSH_BACK_DECL
+#undef ARRAY_LIST_PUSH_BACK_CALL
+#undef ARRAY_LIST_PUSH_BACK_SIGN
+#undef ARRAY_LIST_PUSH_BACK_FNNAME
 #undef ARRAY_LIST_CLEAR_DEFN
 #undef ARRAY_LIST_CLEAR_DECL
+#undef ARRAY_LIST_CLEAR_CALL
+#undef ARRAY_LIST_CLEAR_SIGN
+#undef ARRAY_LIST_CLEAR_FNNAME
+#undef ARRAY_LIST_MOVE_DEFN
+#undef ARRAY_LIST_MOVE_DECL
+#undef ARRAY_LIST_MOVE_CALL
+#undef ARRAY_LIST_MOVE_SIGN
+#undef ARRAY_LIST_MOVE_FNNAME
 #undef ARRAY_LIST_COPY_DEFN
 #undef ARRAY_LIST_COPY_DECL
+#undef ARRAY_LIST_COPY_CALL
+#undef ARRAY_LIST_COPY_SIGN
+#undef ARRAY_LIST_COPY_FNNAME
 #undef ARRAY_LIST_INIT_DEFN
 #undef ARRAY_LIST_INIT_DECL
+#undef ARRAY_LIST_INIT_CALL
+#undef ARRAY_LIST_INIT_SIGN
+#undef ARRAY_LIST_INIT_FNNAME
 #undef ARRAY_LIST_STRUCT_DEFN
+
+#ifdef ARRAY_LIST_TYPENAME_SET
+#undef ARRAY_LIST_TYPENAME_SET
+#undef ARRAY_LIST_TYPENAME
+#endif
+
+#ifdef COLN_FREE_SET
+#undef COLN_FREE_SET
+#undef COLN_FREE
+#endif
+
+#ifdef COLN_ALLOC_SET
+#undef COLN_ALLOC_SET
+#undef COLN_ALLOC
+#endif
+
 #undef COLN_ALLOC_ASSERT
 #undef COLN_ALLOC_ASSIGN
 #undef COLN_ALLOC_ARG
 #undef COLN_ALLOC_DECL
-#undef COLN_FREE
-#undef COLN_ALLOC
-#undef COLN_ALLOC_TYPE
-#undef ARRAY_LIST_TYPENAME
+#undef ARRAY_LIST_COPY_DATA_SNIPPET
 #undef COLN_DATA_CLEAR_MANY
-#undef COLN_DATA_CLEAR
 #undef COLN_DATA_MOVE_MANY
-#undef COLN_DATA_MOVE
-#undef COLN_DATA__PRIV__COPY_MANY_DEFN
-#undef COLN_DATA__PRIV__COPY_MANY_DECLSC
-#undef COLN_DATA__PRIV__COPY_MANY_DECL
-#undef COLN_DATA_COPY_MANY
-#undef COLN_DATA_COPY
-#undef COLN_DATA_TYPENAME
-#undef COLN_HEADER
-#undef COLN_IMPL
+#undef COLN_DATA_MOVE_PTR_FROM_PTR_WRAPPER
+#undef COLN_DATA_RESULT_ASSIGN_WRAPPER
+#undef COLN_DATA_MOVE_PTR_FROM_ARG_WRAPPER
+#undef COLN_DATA_RESULT_RETURN_WRAPPER
+#undef COLN_DATA_RESULT_DECL_WRAPPER
+#undef COLN_DATA_ASSERT_ARG
+#undef COLN_DATA_ARG
+#undef COLN_INTERNAL_ASSERT
 #undef COLN_CAT
 #undef COLN_CAT_
