@@ -1,6 +1,39 @@
+#include "test_common.c"
+
+// Test all by-value code-gen.
 #define COLN_DATA_TYPENAME int
-#define COLN_DATA_TRIVIAL_BY_VAL
-#define COLN_DATA_COMPARE(a, b) ((a) < (b) ? -1 : ((a) == (b) ? 0 : 1))
+#define COLN_DATA_PASS_BY_VAL
+#define COLN_DATA_COMPARE int_compare
+#define COLN_DATA_EQUALS int_equals
+#define COLN_HEADER
+#define COLN_IMPL
+
+#include "array.t.h"
+
+#undef COLN_IMPL
+#undef COLN_HEADER
+#undef COLN_DATA_EQUALS
+#undef COLN_DATA_COMPARE
+#undef COLN_DATA_PASS_BY_VAL
+#undef COLN_DATA_TYPENAME
+
+// Test conditional code-gen. Nothing should be generated here.
+#define COLN_DATA_TYPENAME mat44
+#define COLN_DATA_PASS_BY_PTR
+#define COLN_HEADER
+#define COLN_IMPL
+
+#include "array.t.h"
+
+#undef COLN_IMPL
+#undef COLN_HEADER
+#undef COLN_DATA_PASS_BY_VAL
+#undef COLN_DATA_TYPENAME
+
+// Test by-pointer code-gen without a custom move function.
+#define COLN_DATA_TYPENAME vec4
+#define COLN_DATA_PASS_BY_PTR
+#define COLN_DATA_COMPARE vec4_mag_compare
 #define COLN_HEADER
 #define COLN_IMPL
 
@@ -9,7 +42,26 @@
 #undef COLN_IMPL
 #undef COLN_HEADER
 #undef COLN_DATA_COMPARE
-#undef COLN_DATA_TRIVIAL_BY_VAL
+#undef COLN_DATA_PASS_BY_PTR
+#undef COLN_DATA_TYPENAME
+
+// Test by-pointer code-gen with a custom move function.
+#define COLN_DATA_TYPENAME backrefd_struct
+#define COLN_DATA_PASS_BY_PTR
+#define COLN_DATA_MOVE backrefd_struct_move
+#define COLN_DATA_COMPARE backrefd_struct_compare
+#define COLN_DATA_EQUALS backrefd_struct_equals
+#define COLN_HEADER
+#define COLN_IMPL
+
+#include "array.t.h"
+
+#undef COLN_IMPL
+#undef COLN_HEADER
+#undef COLN_DATA_EQUALS
+#undef COLN_DATA_COMPARE
+#undef COLN_DATA_MOVE
+#undef COLN_DATA_PASS_BY_PTR
 #undef COLN_DATA_TYPENAME
 
 #include <stdbool.h>

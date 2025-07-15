@@ -9,101 +9,70 @@
 #define COLN_CAT_(x, y) x ## y
 
 #if !defined(COLN_HEADER) && !defined(COLN_IMPL)
-#error "COLN_HEADER or COLN_IMPL must be defined"
+  #error "COLN_HEADER or COLN_IMPL must be defined"
 #endif
 
 #ifndef COLN_DATA_TYPENAME
-#error "Collection macros require COLN_DATA_TYPENAME"
+  #error "Collection macros require COLN_DATA_TYPENAME"
 #endif
 
-#if !defined(COLN_DATA_TRIVIAL_BY_VAL) && !defined(COLN_DATA_TRIVIAL_BY_PTR) && \
-    !defined(COLN_DATA_NONTRIVIAL_BY_PTR)
-  #error "Define one of COLN_DATA_TRIVIAL_BY_VAL, COLN_DATA_TRIVIAL_BY_PTR, " \
-    "COLN_DATA_NONTRIVIAL_BY_PTR"
+#if !defined(COLN_DATA_PASS_BY_VAL) && !defined(COLN_DATA_PASS_BY_PTR)
+  #error "Define either COLN_DATA_PASS_BY_VAL or COLN_DATA_PASS_BY_PTR"
 #endif
 
-#ifdef COLN_DATA_TRIVIAL_BY_VAL
-  #ifdef COLN_DATA_TRIVIAL_BY_PTR
-    #error "Define only one of COLN_DATA_TRIVIAL_BY_VAL, " \
-      "COLN_DATA_TRIVIAL_BY_PTR, COLN_DATA_NONTRIVIAL_BY_PTR"
-  #endif
-  #ifdef COLN_DATA_NONTRIVIAL_BY_PTR
-    #error "Define only one of COLN_DATA_TRIVIAL_BY_VAL, " \
-      "COLN_DATA_TRIVIAL_BY_PTR, COLN_DATA_NONTRIVIAL_BY_PTR"
-  #endif
-  #ifdef COLN_DATA_MOVE
-    #error "Data was designated trivial, but a move function was provided"
-  #endif
+#if defined(COLN_DATA_PASS_BY_VAL) && defined(COLN_DATA_PASS_BY_PTR)
+  #error "Define only one of COLN_DATA_PASS_BY_VAL or COLN_DATA_PASS_BY_PTR"
 #endif
 
-#ifdef COLN_DATA_TRIVIAL_BY_PTR
-  #ifdef COLN_DATA_TRIVIAL_BY_VAL
-    #error "Define only one of COLN_DATA_TRIVIAL_BY_VAL, " \
-      "COLN_DATA_TRIVIAL_BY_PTR, COLN_DATA_NONTRIVIAL_BY_PTR"
-  #endif
-  #ifdef COLN_DATA_NONTRIVIAL_BY_PTR
-    #error "Define only one of COLN_DATA_TRIVIAL_BY_VAL, " \
-      "COLN_DATA_TRIVIAL_BY_PTR, COLN_DATA_NONTRIVIAL_BY_PTR"
-  #endif
-  #ifdef COLN_DATA_MOVE
-    #error "Data was designated trivial, but a move function was provided"
-  #endif
-#endif
-
-#ifdef COLN_DATA_NONTRIVIAL_BY_PTR
-  #ifdef COLN_DATA_TRIVIAL_BY_VAL
-    #error "Define only one of COLN_DATA_TRIVIAL_BY_VAL, " \
-      "COLN_DATA_TRIVIAL_BY_PTR, COLN_DATA_NONTRIVIAL_BY_PTR"
-  #endif
-  #ifdef COLN_DATA_TRIVIAL_BY_PTR
-    #error "Define only one of COLN_DATA_TRIVIAL_BY_VAL, " \
-      "COLN_DATA_TRIVIAL_BY_PTR, COLN_DATA_NONTRIVIAL_BY_PTR"
-  #endif
-  #ifndef COLN_DATA_MOVE
-    #error "Data was designated nontrivial, but a move function was not provided"
-  #endif
-#endif
-
-#ifdef COLN_DATA_TRIVIAL_BY_VAL
+#ifdef COLN_DATA_PASS_BY_VAL
   #define COLN_DATA_ARG(arg_name) COLN_DATA_TYPENAME arg_name
   #define COLN_DATA_ASSERT_ARG(arg_name)
-  #define COLN_DATA_EQUALS_PTR_TO_ARG_WRAPPER(array_offset_ptr, to_find_val) \
-    COLN_DATA_EQUALS(*(array_offset_ptr), (to_find_val))
-  #define COLN_DATA_COMPARE_PTR_TO_ARG_WRAPPER(array_offset_ptr, to_find_val) \
-    COLN_DATA_COMPARE(*(array_offset_ptr), (to_find_val))
-  #define COLN_DATA_COMPARE_PTR_TO_PTR_WRAPPER(array_offset_ptr_a, \
-                                            array_offset_ptr_b) \
-    COLN_DATA_COMPARE(*(array_offset_ptr_a), *(array_offset_ptr_b))
+  #define COLN_DATA_EQUALS_PTR_ARG(ptr, arg_val) \
+    COLN_DATA_EQUALS(*(ptr), (arg_val))
+  #define COLN_DATA_COMPARE_PTR_ARG(ptr, arg_val) \
+    COLN_DATA_COMPARE(*(ptr), (arg_val))
+  #define COLN_DATA_COMPARE_PTR_PTR(a, b) \
+    COLN_DATA_COMPARE(*(a), *(b))
 #else 
   #define COLN_DATA_ARG(arg_name) COLN_DATA_TYPENAME *arg_name
   #define COLN_DATA_ASSERT_ARG(arg_name) assert(arg_name)
-  #define COLN_DATA_EQUALS_PTR_TO_ARG_WRAPPER(array_offset_ptr, to_find_ptr) \
-    COLN_DATA_EQUALS((array_offset_ptr), (to_find_val))
-  #define COLN_DATA_COMPARE_PTR_TO_ARG_WRAPPER(array_offset_ptr, to_find_ptr) \
-    COLN_DATA_COMPARE((array_offset_ptr), (to_find_val))
-  #define COLN_DATA_COMPARE_PTR_TO_PTR_WRAPPER(array_offset_ptr_a, \
-                                            array_offset_ptr_b) \
-    COLN_DATA_COMPARE((array_offset_ptr_a), (array_offset_ptr_b))
+  #define COLN_DATA_EQUALS_PTR_ARG(ptr, arg_ptr) \
+    COLN_DATA_EQUALS((ptr), (arg_ptr))
+  #define COLN_DATA_COMPARE_PTR_ARG(ptr, arg_ptr) \
+    COLN_DATA_COMPARE((ptr), (arg_ptr))
+  #define COLN_DATA_COMPARE_PTR_PTR(a, b) \
+    COLN_DATA_COMPARE((a), (b))
 #endif
 
-#ifdef COLN_DATA_NONTRIVIAL_BY_PTR
-  #define COLN_DATA_SWAP_BY_PTR(a, b) \
-    do \
-    { \
-      COLN_DATA_TYPENAME swaptmp; \
-      COLN_DATA_MOVE(&swaptmp, (a)); \
-      COLN_DATA_MOVE((a), (b)); \
-      COLN_DATA_MOVE((b), &swaptmp); \
-    } while(false)
+#ifdef COLN_DATA_MOVE
+  #ifdef COLN_DATA_PASS_BY_VAL
+    #define COLN_DATA_SWAP_PTR_PTR(a, b) \
+      do \
+      { \
+        COLN_DATA_TYPENAME swaptmp; \
+        swaptmp = COLN_DATA_MOVE(*(a)); \
+        *(a) = COLN_DATA_MOVE(*(b)); \
+        *(b) = COLN_DATA_MOVE(swaptmp); \
+      } while(0)
+  #else 
+    #define COLN_DATA_SWAP_PTR_PTR(a, b) \
+      do \
+      { \
+        COLN_DATA_TYPENAME swaptmp; \
+        COLN_DATA_MOVE(&swaptmp, (a)); \
+        COLN_DATA_MOVE((a), (b)); \
+        COLN_DATA_MOVE((b), &swaptmp); \
+      } while(0)
+  #endif
 #else
-  #define COLN_DATA_SWAP_BY_PTR(a, b) \
+  #define COLN_DATA_SWAP_PTR_PTR(a, b) \
     do \
     { \
       COLN_DATA_TYPENAME swaptmp; \
       swaptmp = *(a); \
       *(a) = *(b); \
       *(b) = swaptmp; \
-    } while(false)
+    } while(0)
 #endif
 
 #if !defined(COLN_DATA_EQUALS) && defined(COLN_DATA_COMPARE)
@@ -131,7 +100,7 @@
       assert(array_len > 0 ? array != NULL : true); \
       COLN_DATA_ASSERT_ARG(to_find); \
       for(ptrdiff_t i = 0; i < (ptrdiff_t)array_len; i++) \
-        if(COLN_DATA_EQUALS_PTR_TO_ARG_WRAPPER(array + i, to_find)) return i; \
+        if(COLN_DATA_EQUALS_PTR_ARG(array + i, to_find)) return i; \
       return -1; \
     }
 #else
@@ -162,7 +131,7 @@
       while(left < right) \
       { \
         ptrdiff_t mid = left + ((right - left) >> 1); \
-        int cmp_res = COLN_DATA_COMPARE_PTR_TO_ARG_WRAPPER(array + mid, to_find); \
+        int cmp_res = COLN_DATA_COMPARE_PTR_ARG(array + mid, to_find); \
         if(cmp_res > 0) right = mid; \
         else if(cmp_res == 0) return mid; \
         else left = mid + 1; \
@@ -182,18 +151,18 @@
       if(array_len < 2) return; \
       ptrdiff_t pivot_idx = array_len >> 1; \
       if(pivot_idx != (ptrdiff_t)array_len - 1) \
-        COLN_DATA_SWAP_BY_PTR(array + pivot_idx, array + array_len - 1); \
+        COLN_DATA_SWAP_PTR_PTR(array + pivot_idx, array + array_len - 1); \
       pivot_idx = array_len - 1; \
       ptrdiff_t left_top = 0; \
       ptrdiff_t right_bot = pivot_idx; \
       while(left_top != right_bot) \
       { \
-        int cmp_res = COLN_DATA_COMPARE_PTR_TO_PTR_WRAPPER(array + left_top, \
+        int cmp_res = COLN_DATA_COMPARE_PTR_PTR(array + left_top, \
                                                            array + pivot_idx); \
         if(cmp_res > 0) \
         { \
           right_bot--; \
-          COLN_DATA_SWAP_BY_PTR(array + left_top, array + right_bot); \
+          COLN_DATA_SWAP_PTR_PTR(array + left_top, array + right_bot); \
         } \
         else \
         { \
@@ -202,7 +171,7 @@
       } \
       if(pivot_idx != right_bot) \
       { \
-        COLN_DATA_SWAP_BY_PTR(array + pivot_idx, array + right_bot); \
+        COLN_DATA_SWAP_PTR_PTR(array + pivot_idx, array + right_bot); \
       } \
       right_bot++; \
       ARRAY_QUICK_SORT_CALL(array, left_top); \
@@ -235,7 +204,7 @@
     { \
       assert(array_len > 0 ? array != NULL : true); \
       for(ptrdiff_t i = 1; i < (ptrdiff_t)array_len; i++) \
-        assert(COLN_DATA_COMPARE(array + i - 1, array + i) < 0); \
+        assert(COLN_DATA_COMPARE_PTR_PTR(array + i - 1, array + i) < 0); \
     }
 #else
   #define ARRAY__PRIV__ASSERT_SORTED_FNNAME
@@ -293,10 +262,10 @@ ARRAY__PRIV__ASSERT_SORTED_DEFN
 #undef COLN_DATA_EQUALS
 #endif
 
-#undef COLN_DATA_SWAP_BY_PTR
-#undef COLN_DATA_COMPARE_PTR_TO_PTR_WRAPPER
-#undef COLN_DATA_COMPARE_PTR_TO_ARG_WRAPPER
-#undef COLN_DATA_EQUALS_PTR_TO_ARG_WRAPPER
+#undef COLN_DATA_SWAP_PTR_PTR
+#undef COLN_DATA_COMPARE_PTR_PTR
+#undef COLN_DATA_COMPARE_PTR_ARG
+#undef COLN_DATA_EQUALS_PTR_ARG
 #undef COLN_DATA_ASSERT_ARG
 #undef COLN_DATA_ARG
 

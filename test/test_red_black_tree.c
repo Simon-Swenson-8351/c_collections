@@ -1,8 +1,9 @@
-static int cmp_fn(int *a, int *b);
+#include "test_common.c"
 
-#define COLN_DATA_TYPE int
-#define COLN_TYPE int_red_black_tree
-#define COLN_DATA_COMPARE cmp_fn
+#define COLN_DATA_TYPENAME int
+#define COLN_DATA_PASS_BY_VAL
+#define RB_TREE_TYPENAME int_red_black_tree
+#define COLN_DATA_COMPARE int_compare
 #define COLN_HEADER
 #define COLN_IMPL
 
@@ -11,8 +12,9 @@ static int cmp_fn(int *a, int *b);
 #undef COLN_IMPL
 #undef COLN_HEADER
 #undef COLN_DATA_COMPARE
-#undef COLN_TYPE
-#undef COLN_DATA_TYPE
+#undef RB_TREE_TYPENAME
+#undef COLN_DATA_PASS_BY_VAL
+#undef COLN_DATA_TYPENAME
 
 // for test purposes, this ensures that the header usage of the collection .t.h 
 // is isolated from the header usage of the tests

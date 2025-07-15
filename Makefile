@@ -1,4 +1,4 @@
-CFLAGS := $(CFLAGS) -Iapi -Iinc -Isrc -Itest -Wall -Wextra -Wpedantic -fsanitize=address -g --std=c99
+CFLAGS := $(CFLAGS) -Iapi -Iinc -Isrc -Itest -lm -Wall -Wextra -Wpedantic -fsanitize=address -g --std=c99
 
 DIST_DIR := dist
 DIST_INC_DIR := $(DIST_DIR)/inc

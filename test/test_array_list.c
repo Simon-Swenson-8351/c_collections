@@ -1,5 +1,7 @@
+#include "test_common.c"
+
 #define COLN_DATA_TYPENAME int
-#define COLN_DATA_TRIVIAL_BY_VAL
+#define COLN_DATA_PASS_BY_VAL
 #define ARRAY_LIST_TYPENAME int_array_list
 #define COLN_HEADER
 #define COLN_IMPL
@@ -9,25 +11,11 @@
 #undef COLN_IMPL
 #undef COLN_HEADER
 #undef ARRAY_LIST_TYPENAME
-#undef COLN_DATA_TRIVIAL_BY_VAL
+#undef COLN_DATA_PASS_BY_VAL
 #undef COLN_DATA_TYPENAME
 
-typedef struct mat44
-{
-  float data[16];
-} mat44;
-
-#define MAT44_IDX(matrix, row, column) ((matrix).data[(row) * 4 + (column)])
-
-bool mat44_eq(mat44 *a, mat44 *b)
-{
-  for(size_t i = 0; i < sizeof(a->data)/sizeof(a->data[0]); i++)
-    if(a->data[i] != b->data[i]) return false;
-  return true;
-}
-
 #define COLN_DATA_TYPENAME mat44
-#define COLN_DATA_TRIVIAL_BY_PTR
+#define COLN_DATA_PASS_BY_PTR
 #define ARRAY_LIST_TYPENAME mat44_array_list
 #define COLN_HEADER
 #define COLN_IMPL
@@ -40,39 +28,9 @@ bool mat44_eq(mat44 *a, mat44 *b)
 #undef COLN_DATA_TRIVIAL_BY_PTR
 #undef COLN_DATA_TYPENAME
 
-typedef struct dyn_str
-{
-  char *data;
-} dyn_str;
-
-bool dyn_str_copy(dyn_str *dest, dyn_str *src)
-{
-  assert(dest);
-  assert(src);
-  size_t buf_size = strlen(src->data) + 1;
-  dest->data = malloc(buf_size);
-  if(!(dest->data)) return false;
-  memcpy(dest->data, src->data, buf_size);
-  return true;
-}
-
-void dyn_str_move(dyn_str *dest, dyn_str *src)
-{
-  assert(dest);
-  assert(src);
-  dest->data = src->data;
-}
-
-void dyn_str_clear(dyn_str *to_clear)
-{
-  assert(to_clear);
-  free(to_clear->data);
-}
-
 #define COLN_DATA_TYPENAME dyn_str
-#define COLN_DATA_NONTRIVIAL_BY_PTR
+#define COLN_DATA_PASS_BY_PTR
 #define COLN_DATA_COPY dyn_str_copy
-#define COLN_DATA_MOVE dyn_str_move
 #define COLN_DATA_CLEAR dyn_str_clear
 #define ARRAY_LIST_TYPENAME dyn_str_array_list
 #define COLN_HEADER
@@ -84,9 +42,22 @@ void dyn_str_clear(dyn_str *to_clear)
 #undef COLN_HEADER
 #undef ARRAY_LIST_TYPENAME
 #undef COLN_DATA_CLEAR
-#undef COLN_DATA_MOVE
 #undef COLN_DATA_COPY
-#undef COLN_DATA_NONTRIVIAL_BY_PTR
+#undef COLN_DATA_PASS_BY_PTR
+#undef COLN_DATA_TYPENAME
+
+#define COLN_DATA_TYPENAME backrefd_struct
+#define COLN_DATA_PASS_BY_PTR
+#define COLN_DATA_MOVE backrefd_struct_move
+#define COLN_HEADER
+#define COLN_IMPL
+
+#include "array_list.t.h"
+
+#undef COLN_IMPL
+#undef COLN_HEADER
+#undef COLN_DATA_MOVE
+#undef COLN_DATA_PASS_BY_PTR
 #undef COLN_DATA_TYPENAME
 
 #include <assert.h>
@@ -157,7 +128,6 @@ void test_trivial_data_by_val(void)
   assert(my_al2.data[15] == 42);
   assert(my_al2.data[16] == 9999);
   int_array_list_clear(&my_al2);
-  return 0;
 }
 
 int main(int argc, char **argv)
@@ -165,4 +135,5 @@ int main(int argc, char **argv)
   (void)argc;
   (void)argv;
   test_trivial_data_by_val();
+  return 0;
 }
