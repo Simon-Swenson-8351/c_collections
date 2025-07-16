@@ -7,7 +7,7 @@
 #define COLN_HEADER
 #define COLN_IMPL
 
-#include "red_black_tree.t.h"
+#include "rb_tree.t.h"
 
 #undef COLN_IMPL
 #undef COLN_HEADER
@@ -16,26 +16,48 @@
 #undef COLN_DATA_PASS_BY_VAL
 #undef COLN_DATA_TYPENAME
 
+#define COLN_DATA_TYPENAME dyn_str
+#define COLN_DATA_PASS_BY_PTR
+#define COLN_DATA_COPY dyn_str_copy
+#define COLN_DATA_CLEAR dyn_str_clear
+#define COLN_DATA_COMPARE dyn_str_cmp
+#define COLN_HEADER
+#define COLN_IMPL
+
+#include "rb_tree.t.h"
+
+#undef COLN_IMPL
+#undef COLN_HEADER
+#undef COLN_DATA_COMPARE
+#undef COLN_DATA_CLEAR
+#undef COLN_DATA_COPY
+#undef COLN_DATA_PASS_BY_PTR
+#undef COLN_DATA_TYPENAME
+
 // for test purposes, this ensures that the header usage of the collection .t.h 
 // is isolated from the header usage of the tests
 #include <stdio.h>
 #include <stdlib.h>
 
-#define LEFT_CHILD(node) ((node)->children[(ptrdiff_t)ND_LEFT])
-#define RIGHT_CHILD(node) ((node)->children[(ptrdiff_t)ND_RIGHT])
+#define RB_NODE_COLOR_RED 0 
+#define RB_NODE_COLOR_BLACK 1 
+#define RB_NODE_DIR_LEFT 0 
+#define RB_NODE_DIR_RIGHT 1 
+#define LEFT_CHILD(node) ((node)->children[RB_NODE_DIR_LEFT])
+#define RIGHT_CHILD(node) ((node)->children[RB_NODE_DIR_RIGHT])
 #define ACCESSOR(tree, node) \
-    (!((node)->parent) ? \
-        &((tree)->root) : \
-        (LEFT_CHILD((node)->parent) == node ? \
-            &LEFT_CHILD((node)->parent) : \
-            &RIGHT_CHILD((node)->parent)))
-#define COLOR(node) (node ? (node)->color : NC_BLACK)
+  (!((node)->parent) ? \
+    &((tree)->root) : \
+    (LEFT_CHILD((node)->parent) == node ? \
+      &LEFT_CHILD((node)->parent) : \
+      &RIGHT_CHILD((node)->parent)))
+#define COLOR(node) (node ? (node)->color : RB_NODE_COLOR_BLACK)
 
 static void print_node(int_red_black_tree_node *n, int indentation);
 static void print_indentation(int indentation);
 
 static int_red_black_tree_node *node(int val,
-                                     NodeColor color, 
+                                     int color, 
                                      int_red_black_tree_node *left, 
                                      int_red_black_tree_node *right);
 static bool node_eq(int_red_black_tree_node *a, int_red_black_tree_node *b);
@@ -58,7 +80,7 @@ static bool verify_backrefs(int_red_black_tree_node *n);
         expected_output.root = (expected_output_nodes); \
     \
         int i = (to_insert); \
-        coln_result ins_result = int_red_black_tree_insert(&insertend, &i); \
+        coln_result ins_result = int_red_black_tree_insert(&insertend, i); \
     \
         int result; \
         if(ins_result) \
@@ -98,7 +120,7 @@ static bool verify_backrefs(int_red_black_tree_node *n);
         int removed; \
         int i = (to_remove); \
         coln_result removal_result = int_red_black_tree_remove(&removend, \
-                                                              &i, \
+                                                              i, \
                                                               &removed); \
     \
         int result; \
@@ -147,12 +169,12 @@ int test_copy(void)
     int_red_black_tree t2;
 
     t1.root =
-        node(0, NC_BLACK,
-            node(-16, NC_BLACK, NULL, NULL),
-            node(16, NC_RED, 
-                node(8, NC_BLACK, NULL, NULL),
-                node(24, NC_BLACK, 
-                    node(20, NC_RED, NULL, NULL),
+        node(0, RB_NODE_COLOR_BLACK,
+            node(-16, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(16, RB_NODE_COLOR_RED, 
+                node(8, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(24, RB_NODE_COLOR_BLACK, 
+                    node(20, RB_NODE_COLOR_RED, NULL, NULL),
                     NULL)));
 
     int_red_black_tree_copy(&t2, &t1);
@@ -174,12 +196,12 @@ int test_clear(void)
     int_red_black_tree t1;
     int_red_black_tree_init(&t1);
     t1.root =
-        node(0, NC_BLACK,
-            node(-16, NC_BLACK, NULL, NULL),
-            node(16, NC_RED, 
-                node(8, NC_BLACK, NULL, NULL),
-                node(24, NC_BLACK, 
-                    node(20, NC_RED, NULL, NULL),
+        node(0, RB_NODE_COLOR_BLACK,
+            node(-16, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(16, RB_NODE_COLOR_RED, 
+                node(8, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(24, RB_NODE_COLOR_BLACK, 
+                    node(20, RB_NODE_COLOR_RED, NULL, NULL),
                     NULL)));
     int_red_black_tree_clear(&t1);
     return 0;
@@ -203,7 +225,7 @@ int test_random(void)
         number %= MAX_ELEM;
         if(insert)
         {
-            int_red_black_tree_insert(&t, &number);
+            int_red_black_tree_insert(&t, number);
             elem_counts[number]++;
         }
         else
@@ -216,7 +238,7 @@ int test_random(void)
             } while (j != number);
             if(elem_counts[j] == 0) continue;
             int out;
-            int_red_black_tree_remove(&t, &number, &out);
+            int_red_black_tree_remove(&t, number, &out);
             elem_counts[number]--;
         }
         if(!verify_tree(&t))
@@ -239,334 +261,334 @@ int test_random(void)
 #undef MAX_ELEM
 }
 
-TEST_INS(test_ins_root, NULL, 42, node(42, NC_BLACK, NULL, NULL))
+TEST_INS(test_ins_root, NULL, 42, node(42, RB_NODE_COLOR_BLACK, NULL, NULL))
 TEST_INS(
     test_ins_dup,
-    node(42, NC_BLACK,
-        node(42, NC_RED, NULL, NULL),
+    node(42, RB_NODE_COLOR_BLACK,
+        node(42, RB_NODE_COLOR_RED, NULL, NULL),
         NULL),
     42,
-    node(42, NC_BLACK,
-        node(42, NC_RED, NULL, NULL),
-        node(42, NC_RED, NULL, NULL)))
+    node(42, RB_NODE_COLOR_BLACK,
+        node(42, RB_NODE_COLOR_RED, NULL, NULL),
+        node(42, RB_NODE_COLOR_RED, NULL, NULL)))
 TEST_INS(
     test_ins_with_pr_ur_ll,
-    node(32, NC_BLACK,
-        node(0, NC_BLACK,
-            node(-16, NC_RED, NULL, NULL),
-            node(16, NC_RED, NULL, NULL)),
-        node(48, NC_BLACK, NULL, NULL)),
+    node(32, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_BLACK,
+            node(-16, RB_NODE_COLOR_RED, NULL, NULL),
+            node(16, RB_NODE_COLOR_RED, NULL, NULL)),
+        node(48, RB_NODE_COLOR_BLACK, NULL, NULL)),
     -32,
-    node(32, NC_BLACK,
-        node(0, NC_RED,
-            node(-16, NC_BLACK, 
-                node(-32, NC_RED, NULL, NULL),
+    node(32, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_RED,
+            node(-16, RB_NODE_COLOR_BLACK, 
+                node(-32, RB_NODE_COLOR_RED, NULL, NULL),
                 NULL),
-            node(16, NC_BLACK, NULL, NULL)),
-        node(48, NC_BLACK, NULL, NULL)))
+            node(16, RB_NODE_COLOR_BLACK, NULL, NULL)),
+        node(48, RB_NODE_COLOR_BLACK, NULL, NULL)))
 TEST_INS(
     test_ins_with_pr_ur_lr,
-    node(32, NC_BLACK,
-        node(0, NC_BLACK,
-            node(-16, NC_RED, NULL, NULL),
-            node(16, NC_RED, NULL, NULL)),
-        node(48, NC_BLACK, NULL, NULL)),
+    node(32, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_BLACK,
+            node(-16, RB_NODE_COLOR_RED, NULL, NULL),
+            node(16, RB_NODE_COLOR_RED, NULL, NULL)),
+        node(48, RB_NODE_COLOR_BLACK, NULL, NULL)),
     -8,
-    node(32, NC_BLACK,
-        node(0, NC_RED,
-            node(-16, NC_BLACK,
+    node(32, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_RED,
+            node(-16, RB_NODE_COLOR_BLACK,
                 NULL,
-                node(-8, NC_RED, NULL, NULL)),
-            node(16, NC_BLACK, NULL, NULL)),
-        node(48, NC_BLACK, NULL, NULL)))
+                node(-8, RB_NODE_COLOR_RED, NULL, NULL)),
+            node(16, RB_NODE_COLOR_BLACK, NULL, NULL)),
+        node(48, RB_NODE_COLOR_BLACK, NULL, NULL)))
 TEST_INS(
     test_ins_with_pr_ur_rl,
-    node(32, NC_BLACK,
-        node(0, NC_BLACK,
-            node(-16, NC_RED, NULL, NULL),
-            node(16, NC_RED, NULL, NULL)),
-        node(48, NC_BLACK, NULL, NULL)),
+    node(32, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_BLACK,
+            node(-16, RB_NODE_COLOR_RED, NULL, NULL),
+            node(16, RB_NODE_COLOR_RED, NULL, NULL)),
+        node(48, RB_NODE_COLOR_BLACK, NULL, NULL)),
     8,
-    node(32, NC_BLACK,
-        node(0, NC_RED,
-            node(-16, NC_BLACK, NULL, NULL),
-            node(16, NC_BLACK,
-                node(8, NC_RED, NULL, NULL),
+    node(32, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_RED,
+            node(-16, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(16, RB_NODE_COLOR_BLACK,
+                node(8, RB_NODE_COLOR_RED, NULL, NULL),
                 NULL)),
-        node(48, NC_BLACK, NULL, NULL)))
+        node(48, RB_NODE_COLOR_BLACK, NULL, NULL)))
 TEST_INS(
     test_ins_with_pr_ur_rr,
-    node(32, NC_BLACK,
-        node(0, NC_BLACK,
-            node(-16, NC_RED, NULL, NULL),
-            node(16, NC_RED, NULL, NULL)),
-        node(48, NC_BLACK, NULL, NULL)),
+    node(32, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_BLACK,
+            node(-16, RB_NODE_COLOR_RED, NULL, NULL),
+            node(16, RB_NODE_COLOR_RED, NULL, NULL)),
+        node(48, RB_NODE_COLOR_BLACK, NULL, NULL)),
     24,
-    node(32, NC_BLACK,
-        node(0, NC_RED,
-            node(-16, NC_BLACK, NULL, NULL),
-            node(16, NC_BLACK,
+    node(32, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_RED,
+            node(-16, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(16, RB_NODE_COLOR_BLACK,
                 NULL,
-                node(24, NC_RED, NULL, NULL))),
-        node(48, NC_BLACK, NULL, NULL)))
+                node(24, RB_NODE_COLOR_RED, NULL, NULL))),
+        node(48, RB_NODE_COLOR_BLACK, NULL, NULL)))
 TEST_INS(
     test_ins_with_pr_ur_multiple,
-    node(0, NC_BLACK,
-        node(-32, NC_RED,
-            node(-48, NC_BLACK,
-                node(-52, NC_RED, NULL, NULL),
-                node(-44, NC_RED, NULL, NULL)),
-            node(-16, NC_BLACK, NULL, NULL)),
-        node(32, NC_RED,
-            node(16, NC_BLACK, NULL, NULL),
-            node(48, NC_BLACK, NULL, NULL))),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-32, RB_NODE_COLOR_RED,
+            node(-48, RB_NODE_COLOR_BLACK,
+                node(-52, RB_NODE_COLOR_RED, NULL, NULL),
+                node(-44, RB_NODE_COLOR_RED, NULL, NULL)),
+            node(-16, RB_NODE_COLOR_BLACK, NULL, NULL)),
+        node(32, RB_NODE_COLOR_RED,
+            node(16, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(48, RB_NODE_COLOR_BLACK, NULL, NULL))),
     -46,
-    node(0, NC_BLACK,
-        node(-32, NC_BLACK,
-            node(-48, NC_RED,
-                node(-52, NC_BLACK, NULL, NULL),
-                node(-44, NC_BLACK,
-                    node(-46, NC_RED, NULL, NULL),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-32, RB_NODE_COLOR_BLACK,
+            node(-48, RB_NODE_COLOR_RED,
+                node(-52, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(-44, RB_NODE_COLOR_BLACK,
+                    node(-46, RB_NODE_COLOR_RED, NULL, NULL),
                     NULL)),
-            node(-16, NC_BLACK, NULL, NULL)),
-        node(32, NC_BLACK,
-            node(16, NC_BLACK, NULL, NULL),
-            node(48, NC_BLACK, NULL, NULL))))
+            node(-16, RB_NODE_COLOR_BLACK, NULL, NULL)),
+        node(32, RB_NODE_COLOR_BLACK,
+            node(16, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(48, RB_NODE_COLOR_BLACK, NULL, NULL))))
 TEST_INS(
     test_ins_with_pr_ub_ll,
-    node(0, NC_BLACK,
-        node(-2, NC_RED, NULL, NULL),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-2, RB_NODE_COLOR_RED, NULL, NULL),
         NULL),
     -3,
-    node(-2, NC_BLACK,
-        node(-3, NC_RED, NULL, NULL),
-        node(0, NC_RED, NULL, NULL)))
+    node(-2, RB_NODE_COLOR_BLACK,
+        node(-3, RB_NODE_COLOR_RED, NULL, NULL),
+        node(0, RB_NODE_COLOR_RED, NULL, NULL)))
 TEST_INS(
     test_ins_with_pr_ub_lr,
-    node(0, NC_BLACK,
-        node(-2, NC_RED, NULL, NULL),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-2, RB_NODE_COLOR_RED, NULL, NULL),
         NULL),
     -1,
-    node(-1, NC_BLACK,
-        node(-2, NC_RED, NULL, NULL),
-        node(0, NC_RED, NULL, NULL)))
+    node(-1, RB_NODE_COLOR_BLACK,
+        node(-2, RB_NODE_COLOR_RED, NULL, NULL),
+        node(0, RB_NODE_COLOR_RED, NULL, NULL)))
 TEST_INS(
     test_ins_with_pr_ub_rl,
-    node(0, NC_BLACK,
+    node(0, RB_NODE_COLOR_BLACK,
         NULL,
-        node(2, NC_RED, NULL, NULL)),
+        node(2, RB_NODE_COLOR_RED, NULL, NULL)),
     1,
-    node(1, NC_BLACK,
-        node(0, NC_RED, NULL, NULL),
-        node(2, NC_RED, NULL, NULL)))
+    node(1, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_RED, NULL, NULL),
+        node(2, RB_NODE_COLOR_RED, NULL, NULL)))
 TEST_INS(
     test_ins_with_pr_ub_rr,
-    node(0, NC_BLACK,
+    node(0, RB_NODE_COLOR_BLACK,
         NULL,
-        node(2, NC_RED, NULL, NULL)),
+        node(2, RB_NODE_COLOR_RED, NULL, NULL)),
     3,
-    node(2, NC_BLACK,
-        node(0, NC_RED, NULL, NULL),
-        node(3, NC_RED, NULL, NULL)))
+    node(2, RB_NODE_COLOR_BLACK,
+        node(0, RB_NODE_COLOR_RED, NULL, NULL),
+        node(3, RB_NODE_COLOR_RED, NULL, NULL)))
 TEST_RM(
     test_rm_root,
-    node(0, NC_BLACK, NULL, NULL),
+    node(0, RB_NODE_COLOR_BLACK, NULL, NULL),
     0,
     NULL,
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_missing,
-    node(0, NC_BLACK, NULL, NULL),
+    node(0, RB_NODE_COLOR_BLACK, NULL, NULL),
     1,
-    node(0, NC_BLACK, NULL, NULL),
+    node(0, RB_NODE_COLOR_BLACK, NULL, NULL),
     COLN_RESULT_ELEM_NOT_FOUND)
 TEST_RM(
     test_rm_int_w_2c,
-    node(0, NC_BLACK,
-        node(-4, NC_BLACK, NULL, NULL),
-        node(4, NC_RED,
-            node(2, NC_BLACK,
-                node(1, NC_RED, NULL, NULL),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-4, RB_NODE_COLOR_BLACK, NULL, NULL),
+        node(4, RB_NODE_COLOR_RED,
+            node(2, RB_NODE_COLOR_BLACK,
+                node(1, RB_NODE_COLOR_RED, NULL, NULL),
                 NULL),
-            node(6, NC_BLACK, NULL, NULL))),
+            node(6, RB_NODE_COLOR_BLACK, NULL, NULL))),
     0,
-    node(1, NC_BLACK,
-        node(-4, NC_BLACK, NULL, NULL),
-        node(4, NC_RED,
-            node(2, NC_BLACK,
+    node(1, RB_NODE_COLOR_BLACK,
+        node(-4, RB_NODE_COLOR_BLACK, NULL, NULL),
+        node(4, RB_NODE_COLOR_RED,
+            node(2, RB_NODE_COLOR_BLACK,
                 NULL,
                 NULL),
-            node(6, NC_BLACK, NULL, NULL))),
+            node(6, RB_NODE_COLOR_BLACK, NULL, NULL))),
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_int_w_lc,
-    node(0, NC_BLACK,
-        node(-2, NC_BLACK, 
-            node(-3, NC_RED, NULL, NULL),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-2, RB_NODE_COLOR_BLACK, 
+            node(-3, RB_NODE_COLOR_RED, NULL, NULL),
             NULL),
-        node(2, NC_BLACK, NULL, NULL)),
+        node(2, RB_NODE_COLOR_BLACK, NULL, NULL)),
     -2,
-    node(0, NC_BLACK,
-        node(-3, NC_BLACK, NULL, NULL),
-        node(2, NC_BLACK, NULL, NULL)),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-3, RB_NODE_COLOR_BLACK, NULL, NULL),
+        node(2, RB_NODE_COLOR_BLACK, NULL, NULL)),
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_int_w_rc,
-    node(0, NC_BLACK,
-        node(-2, NC_BLACK, 
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-2, RB_NODE_COLOR_BLACK, 
             NULL,
-            node(-1, NC_RED, NULL, NULL)),
-        node(2, NC_BLACK, NULL, NULL)),
+            node(-1, RB_NODE_COLOR_RED, NULL, NULL)),
+        node(2, RB_NODE_COLOR_BLACK, NULL, NULL)),
     -2,
-    node(0, NC_BLACK,
-        node(-1, NC_BLACK, NULL, NULL),
-        node(2, NC_BLACK, NULL, NULL)),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-1, RB_NODE_COLOR_BLACK, NULL, NULL),
+        node(2, RB_NODE_COLOR_BLACK, NULL, NULL)),
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_r_leaf,
-    node(0, NC_BLACK, 
-        node(-1, NC_RED, NULL, NULL),
-        node(1, NC_RED, NULL, NULL)),
+    node(0, RB_NODE_COLOR_BLACK, 
+        node(-1, RB_NODE_COLOR_RED, NULL, NULL),
+        node(1, RB_NODE_COLOR_RED, NULL, NULL)),
     -1,
-    node(0, NC_BLACK, 
+    node(0, RB_NODE_COLOR_BLACK, 
         NULL,
-        node(1, NC_RED, NULL, NULL)),
+        node(1, RB_NODE_COLOR_RED, NULL, NULL)),
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_blk_leaf_selfleft_parentred_siblingblack_cousinleftblack_cousinrightblack,
-    node(0, NC_BLACK,
-        node(-2, NC_BLACK, NULL, NULL),
-        node(2, NC_RED, 
-            node(1, NC_BLACK, NULL, NULL),
-            node(3, NC_BLACK, NULL, NULL))),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-2, RB_NODE_COLOR_BLACK, NULL, NULL),
+        node(2, RB_NODE_COLOR_RED, 
+            node(1, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(3, RB_NODE_COLOR_BLACK, NULL, NULL))),
     1,
-    node(0, NC_BLACK,
-        node(-2, NC_BLACK, NULL, NULL),
-        node(2, NC_BLACK, 
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-2, RB_NODE_COLOR_BLACK, NULL, NULL),
+        node(2, RB_NODE_COLOR_BLACK, 
             NULL,
-            node(3, NC_RED, NULL, NULL))),
+            node(3, RB_NODE_COLOR_RED, NULL, NULL))),
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_blk_leaf_selfright_parentred_siblingblack_cousinleftblack_cousinrightblack,
-    node(0, NC_BLACK,
-        node(-2, NC_BLACK, NULL, NULL),
-        node(2, NC_RED, 
-            node(1, NC_BLACK, NULL, NULL),
-            node(3, NC_BLACK, NULL, NULL))),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-2, RB_NODE_COLOR_BLACK, NULL, NULL),
+        node(2, RB_NODE_COLOR_RED, 
+            node(1, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(3, RB_NODE_COLOR_BLACK, NULL, NULL))),
     3,
-    node(0, NC_BLACK,
-        node(-2, NC_BLACK, NULL, NULL),
-        node(2, NC_BLACK, 
-            node(1, NC_RED, NULL, NULL),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-2, RB_NODE_COLOR_BLACK, NULL, NULL),
+        node(2, RB_NODE_COLOR_BLACK, 
+            node(1, RB_NODE_COLOR_RED, NULL, NULL),
             NULL)),
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_blk_leaf_selfleft_parentred_siblingblack_cousinleftred_cousinrightblack,
-    node(0, NC_BLACK,
-        node(-8, NC_BLACK, 
-            node(-12, NC_BLACK, NULL, NULL), 
-            node(-4, NC_BLACK, NULL, NULL)),
-        node(8, NC_RED, 
-            node(4, NC_BLACK,
-                node(2, NC_BLACK, NULL, NULL), 
-                node(6, NC_BLACK, NULL, NULL)),
-            node(12, NC_BLACK,
-                node(10, NC_RED, 
-                    node(9, NC_BLACK, NULL, NULL),
-                    node(11, NC_BLACK, NULL, NULL)),
-                node(14, NC_BLACK, NULL, NULL)))),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-8, RB_NODE_COLOR_BLACK, 
+            node(-12, RB_NODE_COLOR_BLACK, NULL, NULL), 
+            node(-4, RB_NODE_COLOR_BLACK, NULL, NULL)),
+        node(8, RB_NODE_COLOR_RED, 
+            node(4, RB_NODE_COLOR_BLACK,
+                node(2, RB_NODE_COLOR_BLACK, NULL, NULL), 
+                node(6, RB_NODE_COLOR_BLACK, NULL, NULL)),
+            node(12, RB_NODE_COLOR_BLACK,
+                node(10, RB_NODE_COLOR_RED, 
+                    node(9, RB_NODE_COLOR_BLACK, NULL, NULL),
+                    node(11, RB_NODE_COLOR_BLACK, NULL, NULL)),
+                node(14, RB_NODE_COLOR_BLACK, NULL, NULL)))),
     2,
-    node(0, NC_BLACK,
-        node(-8, NC_BLACK, 
-            node(-12, NC_BLACK, NULL, NULL), 
-            node(-4, NC_BLACK, NULL, NULL)),
-        node(10, NC_RED,
-            node(8, NC_BLACK,
-                node(4, NC_BLACK,
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-8, RB_NODE_COLOR_BLACK, 
+            node(-12, RB_NODE_COLOR_BLACK, NULL, NULL), 
+            node(-4, RB_NODE_COLOR_BLACK, NULL, NULL)),
+        node(10, RB_NODE_COLOR_RED,
+            node(8, RB_NODE_COLOR_BLACK,
+                node(4, RB_NODE_COLOR_BLACK,
                     NULL,
-                    node(6, NC_RED, NULL, NULL)),
-                node(9, NC_BLACK, NULL, NULL)),
-            node(12, NC_BLACK,
-                node(11, NC_BLACK, NULL, NULL),
-                node(14, NC_BLACK, NULL, NULL)))),
+                    node(6, RB_NODE_COLOR_RED, NULL, NULL)),
+                node(9, RB_NODE_COLOR_BLACK, NULL, NULL)),
+            node(12, RB_NODE_COLOR_BLACK,
+                node(11, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(14, RB_NODE_COLOR_BLACK, NULL, NULL)))),
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_blk_leaf_selfleft_parentblack_siblingblack_cousinleftred_cousinrightblack,
-    node(0, NC_BLACK,
-        node(-8, NC_BLACK, 
-            node(-12, NC_BLACK,
-                node(-14, NC_BLACK, NULL, NULL),
-                node(-10, NC_BLACK, NULL, NULL)), 
-            node(-4, NC_BLACK,
-                node(-6, NC_BLACK, NULL, NULL),
-                node(-2, NC_BLACK, NULL, NULL))),
-        node(8, NC_BLACK, 
-            node(4, NC_BLACK,
-                node(2, NC_BLACK, NULL, NULL), 
-                node(6, NC_BLACK, NULL, NULL)),
-            node(12, NC_BLACK,
-                node(10, NC_RED, 
-                    node(9, NC_BLACK, NULL, NULL),
-                    node(11, NC_BLACK, NULL, NULL)),
-                node(14, NC_BLACK, NULL, NULL)))),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-8, RB_NODE_COLOR_BLACK, 
+            node(-12, RB_NODE_COLOR_BLACK,
+                node(-14, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(-10, RB_NODE_COLOR_BLACK, NULL, NULL)), 
+            node(-4, RB_NODE_COLOR_BLACK,
+                node(-6, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(-2, RB_NODE_COLOR_BLACK, NULL, NULL))),
+        node(8, RB_NODE_COLOR_BLACK, 
+            node(4, RB_NODE_COLOR_BLACK,
+                node(2, RB_NODE_COLOR_BLACK, NULL, NULL), 
+                node(6, RB_NODE_COLOR_BLACK, NULL, NULL)),
+            node(12, RB_NODE_COLOR_BLACK,
+                node(10, RB_NODE_COLOR_RED, 
+                    node(9, RB_NODE_COLOR_BLACK, NULL, NULL),
+                    node(11, RB_NODE_COLOR_BLACK, NULL, NULL)),
+                node(14, RB_NODE_COLOR_BLACK, NULL, NULL)))),
     2,
-    node(0, NC_BLACK,
-        node(-8, NC_BLACK,
-            node(-12, NC_BLACK,
-                node(-14, NC_BLACK, NULL, NULL),
-                node(-10, NC_BLACK, NULL, NULL)), 
-            node(-4, NC_BLACK,
-                node(-6, NC_BLACK, NULL, NULL),
-                node(-2, NC_BLACK, NULL, NULL))),
-        node(10, NC_BLACK,
-            node(8, NC_BLACK,
-                node(4, NC_BLACK,
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-8, RB_NODE_COLOR_BLACK,
+            node(-12, RB_NODE_COLOR_BLACK,
+                node(-14, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(-10, RB_NODE_COLOR_BLACK, NULL, NULL)), 
+            node(-4, RB_NODE_COLOR_BLACK,
+                node(-6, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(-2, RB_NODE_COLOR_BLACK, NULL, NULL))),
+        node(10, RB_NODE_COLOR_BLACK,
+            node(8, RB_NODE_COLOR_BLACK,
+                node(4, RB_NODE_COLOR_BLACK,
                     NULL,
-                    node(6, NC_RED, NULL, NULL)),
-                node(9, NC_BLACK, NULL, NULL)),
-            node(12, NC_BLACK,
-                node(11, NC_BLACK, NULL, NULL),
-                node(14, NC_BLACK, NULL, NULL)))),
+                    node(6, RB_NODE_COLOR_RED, NULL, NULL)),
+                node(9, RB_NODE_COLOR_BLACK, NULL, NULL)),
+            node(12, RB_NODE_COLOR_BLACK,
+                node(11, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(14, RB_NODE_COLOR_BLACK, NULL, NULL)))),
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_blk_leaf_selfright_parentblack_siblingblack_cousinleftred_cousinrightblack,
-    node(0, NC_BLACK,
-        node(-4, NC_BLACK,
-            node(-6, NC_RED,
-                node(-7, NC_BLACK, NULL, NULL),
-                node(-5, NC_BLACK, NULL, NULL)),
-            node(-2, NC_BLACK, NULL, NULL)),
-        node(4, NC_BLACK,
-            node(2, NC_BLACK, NULL, NULL),
-            node(6, NC_BLACK, NULL, NULL))),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-4, RB_NODE_COLOR_BLACK,
+            node(-6, RB_NODE_COLOR_RED,
+                node(-7, RB_NODE_COLOR_BLACK, NULL, NULL),
+                node(-5, RB_NODE_COLOR_BLACK, NULL, NULL)),
+            node(-2, RB_NODE_COLOR_BLACK, NULL, NULL)),
+        node(4, RB_NODE_COLOR_BLACK,
+            node(2, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(6, RB_NODE_COLOR_BLACK, NULL, NULL))),
     6,
-    node(-4, NC_BLACK,
-        node(-6, NC_BLACK,
-            node(-7, NC_BLACK, NULL, NULL),
-            node(-5, NC_BLACK, NULL, NULL)),
-        node(0, NC_BLACK,
-            node(-2, NC_BLACK, NULL, NULL),
-            node(4, NC_BLACK,
-                node(2, NC_RED, NULL, NULL),
+    node(-4, RB_NODE_COLOR_BLACK,
+        node(-6, RB_NODE_COLOR_BLACK,
+            node(-7, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(-5, RB_NODE_COLOR_BLACK, NULL, NULL)),
+        node(0, RB_NODE_COLOR_BLACK,
+            node(-2, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(4, RB_NODE_COLOR_BLACK,
+                node(2, RB_NODE_COLOR_RED, NULL, NULL),
                 NULL))),
     COLN_RESULT_SUCCESS)
 TEST_RM(
     test_rm_blk_leaf_selfleft_siblingred,
-    node(0, NC_BLACK,
-        node(-4, NC_BLACK, NULL, NULL),
-        node(4, NC_RED,
-            node(2, NC_BLACK,
-                node(1, NC_RED, NULL, NULL),
-                node(3, NC_RED, NULL, NULL)),
-            node(6, NC_BLACK, NULL, NULL))),
+    node(0, RB_NODE_COLOR_BLACK,
+        node(-4, RB_NODE_COLOR_BLACK, NULL, NULL),
+        node(4, RB_NODE_COLOR_RED,
+            node(2, RB_NODE_COLOR_BLACK,
+                node(1, RB_NODE_COLOR_RED, NULL, NULL),
+                node(3, RB_NODE_COLOR_RED, NULL, NULL)),
+            node(6, RB_NODE_COLOR_BLACK, NULL, NULL))),
     -4,
-    node(4, NC_BLACK,
-        node(1, NC_RED,
-            node(0, NC_BLACK, NULL, NULL),
-            node(2, NC_BLACK,
+    node(4, RB_NODE_COLOR_BLACK,
+        node(1, RB_NODE_COLOR_RED,
+            node(0, RB_NODE_COLOR_BLACK, NULL, NULL),
+            node(2, RB_NODE_COLOR_BLACK,
                 NULL,
-                node(3, NC_RED, NULL, NULL))),
-        node(6, NC_BLACK, NULL, NULL)),
+                node(3, RB_NODE_COLOR_RED, NULL, NULL))),
+        node(6, RB_NODE_COLOR_BLACK, NULL, NULL)),
     COLN_RESULT_SUCCESS)
 
 struct test_case
@@ -638,7 +660,7 @@ static void print_node(int_red_black_tree_node *n, int indentation)
     if(!n) return;
     print_node(LEFT_CHILD(n), indentation + 1);
     print_indentation(indentation);
-    printf("%s     %d\n", (n->color == NC_RED) ? "\033[31mRED\033[0m" : "\033[32mBLK\033[0m", n->data);
+    printf("%s     %d\n", (n->color == RB_NODE_COLOR_RED) ? "\033[31mRED\033[0m" : "\033[32mBLK\033[0m", n->data);
     print_node(RIGHT_CHILD(n), indentation + 1);
 }
 
@@ -651,7 +673,7 @@ static void print_indentation(int indentation)
 }
 
 static int_red_black_tree_node *node(int val,
-                                     NodeColor color,
+                                     int color,
                                      int_red_black_tree_node *left,
                                      int_red_black_tree_node *right)
 {
@@ -709,17 +731,17 @@ static int verify_bdepth(int_red_black_tree_node *n)
     int lbd = verify_bdepth(LEFT_CHILD(n));
     int rbd = verify_bdepth(RIGHT_CHILD(n));
     if(lbd != rbd) return -1;
-    if(n->color == NC_RED) return lbd;
+    if(n->color == RB_NODE_COLOR_RED) return lbd;
     else return lbd + 1;
 }
 
 static bool verify_red_nadj(int_red_black_tree_node *n)
 {
     if(!n) return true;
-    if(n->color == NC_RED)
+    if(n->color == RB_NODE_COLOR_RED)
     {
-        if(LEFT_CHILD(n) && LEFT_CHILD(n)->color == NC_RED) return false;
-        if(RIGHT_CHILD(n) && RIGHT_CHILD(n)->color == NC_RED) return false;
+        if(LEFT_CHILD(n) && LEFT_CHILD(n)->color == RB_NODE_COLOR_RED) return false;
+        if(RIGHT_CHILD(n) && RIGHT_CHILD(n)->color == RB_NODE_COLOR_RED) return false;
     }
     if(!verify_red_nadj(LEFT_CHILD(n))) return false;
     if(!verify_red_nadj(RIGHT_CHILD(n))) return false;

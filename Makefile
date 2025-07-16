@@ -3,7 +3,7 @@ CFLAGS := $(CFLAGS) -Iapi -Iinc -Isrc -Itest -lm -Wall -Wextra -Wpedantic -fsani
 DIST_DIR := dist
 DIST_INC_DIR := $(DIST_DIR)/inc
 TEST_BUILD_DIR := build/test
-DATASTRUCTURES := array array_list red_black_tree hash_table
+DATASTRUCTURES := array array_list rb_tree hash_table
 TEST_BINS := $(addprefix $(TEST_BUILD_DIR)/test_,$(DATASTRUCTURES))
 DIST_INC_FILES := $(addprefix $(DIST_INC_DIR)/,$(addsuffix .t.h,$(DATASTRUCTURES)) coln_result.h)
 
