@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -116,3 +117,134 @@ int dyn_str_cmp(dyn_str *a, dyn_str *b)
   assert(b->data);
   return strcmp(a->data, b->data);
 }
+
+typedef struct linear_allocator
+{
+  uint8_t *buf;
+  size_t buf_cap;
+  size_t allocated;
+} linear_allocator;
+
+#define UNIVERSALIZE_SIZE(size) \
+  (((size) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
+
+bool linear_allocator_init(linear_allocator *to_init, size_t cap)
+{
+  assert(to_init);
+  assert(cap > 0);
+  cap = UNIVERSALIZE_SIZE(cap);
+  to_init->buf = malloc(cap);
+  if(!(to_init->buf)) return false;
+  to_init->buf_cap = cap;
+  to_init->allocated = 0;
+  return true;
+}
+
+void linear_allocator_clear(linear_allocator *to_clear)
+{
+  assert(to_clear);
+  free(to_clear->buf);
+}
+
+void *linear_allocator_alloc(linear_allocator *alloc, size_t to_alloc)
+{
+  assert(alloc);
+  to_alloc = UNIVERSALIZE_SIZE(to_alloc);
+  if(alloc->allocated + to_alloc > alloc->buf_cap) return NULL;
+  void *result = alloc->buf + alloc->allocated;
+  alloc->allocated += to_alloc;
+  return result;
+}
+
+typedef struct slot_segment_header
+{
+  struct slot_segment_header *next_segment;
+} slot_segment_header;
+#define SLOT_SEGMENT_HEADER_SIZE UNIVERSALIZE_SIZE(sizeof(slot_segment_header))
+
+typedef struct slot_header
+{
+  struct slot_header *next_free;
+} slot_header;
+#define SLOT_HEADER_SIZE UNIVERSALIZE_SIZE(sizeof(slot_header))
+
+typedef struct dynamic_slot_allocator
+{
+  slot_segment_header *first_segment;
+  slot_header *first_free;
+  size_t slot_size;
+  size_t used;
+  size_t cap;
+} dynamic_slot_allocator;
+
+bool dynamic_slot_allocator_expand(dynamic_slot_allocator *to_expand,
+                                   size_t slots_to_add)
+{
+  assert(to_expand);
+  assert(slots_to_add > 0);
+  size_t inc = SLOT_HEADER_SIZE + to_expand->slot_size;
+  slot_segment_header *new_segment = malloc(SLOT_SEGMENT_HEADER_SIZE + 
+    slots_to_add * inc);
+  if(!new_segment) return false;
+  new_segment->next_segment = to_expand->first_segment;
+  to_expand->first_segment = new_segment;
+  to_expand->cap += slots_to_add;
+  uint8_t *base = (uint8_t *)new_segment + SLOT_SEGMENT_HEADER_SIZE;
+  for(size_t i = 0; i < slots_to_add; i++)
+  {
+    slot_header *cur = (slot_header *)(base + i * inc);
+    cur->next_free = to_expand->first_free;
+    to_expand->first_free = cur;
+  }
+  return true;
+}
+
+bool dynamic_slot_allocator_init(dynamic_slot_allocator *to_init,
+                                 size_t slot_size,
+                                 size_t initial_cap)
+{
+  assert(to_init);
+  assert(slot_size > 0);
+  assert(initial_cap > 0);
+  to_init->first_segment = NULL;
+  to_init->first_free = NULL;
+  to_init->slot_size = UNIVERSALIZE_SIZE(slot_size);
+  to_init->used = 0;
+  to_init->cap = 0;
+  return dynamic_slot_allocator_expand(to_init, initial_cap);
+}
+
+void dynamic_slot_allocator_clear(dynamic_slot_allocator *to_clear)
+{
+  assert(to_clear);
+  slot_segment_header *cur = to_clear->first_segment;
+  while(cur)
+  {
+    slot_segment_header *next = cur->next_segment;
+    free(cur);
+    cur = next;
+  }
+}
+
+void *dynamic_slot_allocator_alloc(dynamic_slot_allocator *alloc, size_t size)
+{
+  assert(size <= alloc->slot_size);
+  if(!(alloc->first_free) && !dynamic_slot_allocator_expand(alloc, alloc->cap))
+    return NULL;
+  assert(alloc->first_free);
+  void *result = (uint8_t *)(alloc->first_free) + SLOT_HEADER_SIZE;
+  alloc->first_free = alloc->first_free->next_free;
+  alloc->used++;
+  return result;
+}
+
+void dynamic_slot_allocator_free(dynamic_slot_allocator *alloc, void *to_free)
+{
+  assert(alloc);
+  assert(to_free);
+  ((slot_header *)to_free)->next_free = alloc->first_free;
+  alloc->first_free = (slot_header *)to_free;
+  alloc->used--;
+}
+
+#undef UNIVERSALIZE_SIZE

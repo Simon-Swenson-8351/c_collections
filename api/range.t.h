@@ -21,6 +21,8 @@
   #error "Define RANGE_DATA_COMPARE to use range macros"
 #endif
 
+#if !defined(RANGE_DATA)
+
 // RANGE_DATA_TRIVIAL_BY_VAL_RANGE_BY_VAL
 // RANGE_DATA_TRIVIAL_BY_VAL_RANGE_BY_PTR
 // RANGE_DATA_TRIVIAL_BY_PTR

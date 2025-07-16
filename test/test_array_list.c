@@ -1,67 +1,80 @@
 #include "test_common.c"
 
-#define COLN_DATA_TYPENAME int
-#define COLN_DATA_PASS_BY_VAL
+void linear_allocator_free_dummy(linear_allocator *alloc, void *to_free)
+{
+  (void)alloc;
+  (void)to_free;
+}
+
+#define DATA_TYPENAME int
+#define DATA_PASS_BY_VAL
 #define ARRAY_LIST_TYPENAME int_array_list
-#define COLN_HEADER
-#define COLN_IMPL
+#define ARRAY_LIST_HEADER
+#define ARRAY_LIST_IMPL
 
 #include "array_list.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
+#undef ARRAY_LIST_IMPL
+#undef ARRAY_LIST_HEADER
 #undef ARRAY_LIST_TYPENAME
-#undef COLN_DATA_PASS_BY_VAL
-#undef COLN_DATA_TYPENAME
+#undef DATA_PASS_BY_VAL
+#undef DATA_TYPENAME
 
-#define COLN_DATA_TYPENAME mat44
-#define COLN_DATA_PASS_BY_PTR
+#define DATA_TYPENAME mat44
+#define DATA_PASS_BY_PTR
+#define ALLOC_TYPENAME linear_allocator
+#define ALLOC_ALLOC linear_allocator_alloc
+#define ALLOC_FREE linear_allocator_free_dummy
 #define ARRAY_LIST_TYPENAME mat44_array_list
-#define COLN_HEADER
-#define COLN_IMPL
+#define ARRAY_LIST_HEADER
+#define ARRAY_LIST_IMPL
 
 #include "array_list.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
+#undef ARRAY_LIST_IMPL
+#undef ARRAY_LIST_HEADER
 #undef ARRAY_LIST_TYPENAME
-#undef COLN_DATA_TRIVIAL_BY_PTR
-#undef COLN_DATA_TYPENAME
+#undef ALLOC_FREE
+#undef ALLOC_ALLOC
+#undef ALLOC_TYPENAME
+#undef DATA_TRIVIAL_BY_PTR
+#undef DATA_TYPENAME
 
-#define COLN_DATA_TYPENAME dyn_str
-#define COLN_DATA_PASS_BY_PTR
-#define COLN_DATA_COPY dyn_str_copy
-#define COLN_DATA_CLEAR dyn_str_clear
+#define DATA_TYPENAME dyn_str
+#define DATA_PASS_BY_PTR
+#define DATA_COPY dyn_str_copy
+#define DATA_CLEAR dyn_str_clear
 #define ARRAY_LIST_TYPENAME dyn_str_array_list
-#define COLN_HEADER
-#define COLN_IMPL
+#define ARRAY_LIST_HEADER
+#define ARRAY_LIST_IMPL
 
 #include "array_list.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
+#undef ARRAY_LIST_IMPL
+#undef ARRAY_LIST_HEADER
 #undef ARRAY_LIST_TYPENAME
-#undef COLN_DATA_CLEAR
-#undef COLN_DATA_COPY
-#undef COLN_DATA_PASS_BY_PTR
-#undef COLN_DATA_TYPENAME
+#undef DATA_CLEAR
+#undef DATA_COPY
+#undef DATA_PASS_BY_PTR
+#undef DATA_TYPENAME
 
-#define COLN_DATA_TYPENAME backrefd_struct
-#define COLN_DATA_PASS_BY_PTR
-#define COLN_DATA_MOVE backrefd_struct_move
-#define COLN_HEADER
-#define COLN_IMPL
+#define DATA_TYPENAME backrefd_struct
+#define DATA_PASS_BY_PTR
+#define DATA_MOVE backrefd_struct_move
+#define ARRAY_LIST_HEADER
+#define ARRAY_LIST_IMPL
 
 #include "array_list.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
-#undef COLN_DATA_MOVE
-#undef COLN_DATA_PASS_BY_PTR
-#undef COLN_DATA_TYPENAME
+#undef ARRAY_LIST_IMPL
+#undef ARRAY_LIST_HEADER
+#undef DATA_MOVE
+#undef DATA_PASS_BY_PTR
+#undef DATA_TYPENAME
 
 #include <assert.h>
 #include <stdio.h>
+
 
 void test_trivial_data_by_val(void)
 {
@@ -130,10 +143,36 @@ void test_trivial_data_by_val(void)
   int_array_list_clear(&my_al2);
 }
 
+void test_with_alloc(void)
+{
+  #define POP_MAT(mat, mult) \
+    do \
+    { \
+      for(int row = 0; row < 4; row++) \
+        for(int col = 0; col < 4; col++) \
+          MAT44_IDX(mat, row, col) = mult * (4 * row + col); \
+    } while(0)
+  linear_allocator alloc;
+  assert(linear_allocator_init(&alloc, sizeof(mat44) * 4));
+  mat44_array_list my_al;
+  assert(!mat44_array_list_init(&my_al, &alloc, 1));
+  mat44 tmp;
+  POP_MAT(tmp, 2);
+  assert(!mat44_array_list_push_back(&my_al, &tmp));
+  POP_MAT(tmp, 3);
+  assert(!mat44_array_list_push_back(&my_al, &tmp));
+  POP_MAT(tmp, 5);
+  assert(mat44_array_list_push_back(&my_al, &tmp) == COLN_RESULT_ALLOC_FAILED);
+  mat44_array_list_clear(&my_al);
+  linear_allocator_clear(&alloc);
+  #undef POP_MAT
+}
+
 int main(int argc, char **argv)
 {
   (void)argc;
   (void)argv;
   test_trivial_data_by_val();
+  test_with_alloc();
   return 0;
 }

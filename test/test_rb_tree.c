@@ -2,8 +2,8 @@
 
 #define COLN_DATA_TYPENAME int
 #define COLN_DATA_PASS_BY_VAL
-#define RB_TREE_TYPENAME int_red_black_tree
 #define COLN_DATA_COMPARE int_compare
+#define RB_TREE_TYPENAME int_red_black_tree
 #define COLN_HEADER
 #define COLN_IMPL
 
@@ -11,8 +11,30 @@
 
 #undef COLN_IMPL
 #undef COLN_HEADER
-#undef COLN_DATA_COMPARE
 #undef RB_TREE_TYPENAME
+#undef COLN_DATA_COMPARE
+#undef COLN_DATA_PASS_BY_VAL
+#undef COLN_DATA_TYPENAME
+
+#define COLN_DATA_TYPENAME int
+#define COLN_DATA_PASS_BY_VAL
+#define COLN_DATA_COMPARE int_compare
+#define COLN_ALLOC_TYPENAME dynamic_slot_allocator
+#define COLN_ALLOC dynamic_slot_allocator_alloc
+#define COLN_FREE dynamic_slot_allocator_free
+#define RB_TREE_TYPENAME int_slot_allocd_red_black_tree
+#define COLN_HEADER
+#define COLN_IMPL
+
+#include "rb_tree.t.h"
+
+#undef COLN_IMPL
+#undef COLN_HEADER
+#undef RB_TREE_TYPENAME
+#undef COLN_FREE
+#undef COLN_ALLOC
+#undef COLN_ALLOC_TYPENAME
+#undef COLN_DATA_COMPARE
 #undef COLN_DATA_PASS_BY_VAL
 #undef COLN_DATA_TYPENAME
 

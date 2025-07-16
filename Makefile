@@ -18,7 +18,7 @@ check: $(TEST_BINS)
 				$$test || exit 1; \
 		done
 		@echo "All tests passed."
-$(TEST_BUILD_DIR)/test_%: test/test_%.c api/%.t.h
+$(TEST_BUILD_DIR)/test_%: test/test_%.c api/%.t.h test/test_common.c
 		@mkdir -p $(dir $@)
 		$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
 

@@ -1,68 +1,68 @@
 #include "test_common.c"
 
 // Test all by-value code-gen.
-#define COLN_DATA_TYPENAME int
-#define COLN_DATA_PASS_BY_VAL
-#define COLN_DATA_COMPARE int_compare
-#define COLN_DATA_EQUALS int_equals
-#define COLN_HEADER
-#define COLN_IMPL
+#define DATA_TYPENAME int
+#define DATA_PASS_BY_VAL
+#define DATA_COMPARE int_compare
+#define DATA_EQUALS int_equals
+#define ARRAY_HEADER
+#define ARRAY_IMPL
 
 #include "array.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
-#undef COLN_DATA_EQUALS
-#undef COLN_DATA_COMPARE
-#undef COLN_DATA_PASS_BY_VAL
-#undef COLN_DATA_TYPENAME
+#undef ARRAY_IMPL
+#undef ARRAY_HEADER
+#undef DATA_EQUALS
+#undef DATA_COMPARE
+#undef DATA_PASS_BY_VAL
+#undef DATA_TYPENAME
 
 // Test conditional code-gen. Nothing should be generated here.
-#define COLN_DATA_TYPENAME mat44
-#define COLN_DATA_PASS_BY_PTR
-#define COLN_HEADER
-#define COLN_IMPL
+#define DATA_TYPENAME mat44
+#define DATA_PASS_BY_PTR
+#define ARRAY_HEADER
+#define ARRAY_IMPL
 
 #include "array.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
-#undef COLN_DATA_PASS_BY_VAL
-#undef COLN_DATA_TYPENAME
+#undef ARRAY_IMPL
+#undef ARRAY_HEADER
+#undef DATA_PASS_BY_VAL
+#undef DATA_TYPENAME
 
 // Test by-pointer code-gen without a custom move function.
-#define COLN_DATA_TYPENAME vec4
-#define COLN_DATA_PASS_BY_PTR
-#define COLN_DATA_COMPARE vec4_mag_compare
-#define COLN_HEADER
-#define COLN_IMPL
+#define DATA_TYPENAME vec4
+#define DATA_PASS_BY_PTR
+#define DATA_COMPARE vec4_mag_compare
+#define ARRAY_HEADER
+#define ARRAY_IMPL
 
 #include "array.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
-#undef COLN_DATA_COMPARE
-#undef COLN_DATA_PASS_BY_PTR
-#undef COLN_DATA_TYPENAME
+#undef ARRAY_IMPL
+#undef ARRAY_HEADER
+#undef DATA_COMPARE
+#undef DATA_PASS_BY_PTR
+#undef DATA_TYPENAME
 
 // Test by-pointer code-gen with a custom move function.
-#define COLN_DATA_TYPENAME backrefd_struct
-#define COLN_DATA_PASS_BY_PTR
-#define COLN_DATA_MOVE backrefd_struct_move
-#define COLN_DATA_COMPARE backrefd_struct_compare
-#define COLN_DATA_EQUALS backrefd_struct_equals
-#define COLN_HEADER
-#define COLN_IMPL
+#define DATA_TYPENAME backrefd_struct
+#define DATA_PASS_BY_PTR
+#define DATA_MOVE backrefd_struct_move
+#define DATA_COMPARE backrefd_struct_compare
+#define DATA_EQUALS backrefd_struct_equals
+#define ARRAY_HEADER
+#define ARRAY_IMPL
 
 #include "array.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
-#undef COLN_DATA_EQUALS
-#undef COLN_DATA_COMPARE
-#undef COLN_DATA_MOVE
-#undef COLN_DATA_PASS_BY_PTR
-#undef COLN_DATA_TYPENAME
+#undef ARRAY_IMPL
+#undef ARRAY_HEADER
+#undef DATA_EQUALS
+#undef DATA_COMPARE
+#undef DATA_MOVE
+#undef DATA_PASS_BY_PTR
+#undef DATA_TYPENAME
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -122,5 +122,3 @@ int main(int argc, char **argv)
   assert(found_bad_needle_idx < 0);
   return 0;
 }
-
-#undef COLN_DATA_COMPARE
