@@ -5,6 +5,8 @@
 #define DATA_PASS_BY_VAL
 #define DATA_COMPARE int_compare
 #define DATA_EQUALS int_equals
+#define DATA_DIGIT_LEN (sizeof(int) * 8)
+#define DATA_DIGIT(data, digit) (((data) >> (digit)) & 1)
 #define ARRAY_HEADER
 #define ARRAY_IMPL
 
@@ -74,22 +76,22 @@ int main(int argc, char **argv)
   (void)argc;
   (void)argv;
   int my_array[1024];
-  ptrdiff_t needle_idx = 
-    (ptrdiff_t)(sizeof(my_array)/sizeof(my_array[0]) / 4 * 3);
+  int my_array2[1024];
+  size_t needle_idx = 
+    (sizeof(my_array)/sizeof(my_array[0])) * 3 / 4;
   int needle;
   srand(42);
-  for(ptrdiff_t i = 0;
-      i < (ptrdiff_t)(sizeof(my_array)/sizeof(my_array[0]));
-      i++)
+  for(size_t i = 0; i < sizeof(my_array)/sizeof(my_array[0]); i++)
   {
     my_array[i] = rand();
+    my_array2[i] = my_array[i];
   }
   needle = my_array[needle_idx];
   int bad_needle = rand();
   while(true)
   {
-    ptrdiff_t i;
-    for(i = 0; i < (ptrdiff_t)(sizeof(my_array)/sizeof(my_array[0])); i++)
+    size_t i;
+    for(i = 0; i < sizeof(my_array)/sizeof(my_array[0]); i++)
     {
       if(bad_needle == my_array[i])
       {
@@ -103,20 +105,31 @@ int main(int argc, char **argv)
     my_array,
     sizeof(my_array)/sizeof(my_array[0]),
     needle);
-  assert(found_needle_idx == needle_idx);
+  assert(found_needle_idx == (ptrdiff_t)needle_idx);
   ptrdiff_t found_bad_needle_idx = int_array_linear_search(
     my_array,
     sizeof(my_array)/sizeof(my_array[0]),
     bad_needle);
   assert(found_bad_needle_idx < 0);
   int_array_quick_sort(my_array, sizeof(my_array)/sizeof(my_array[0]));
+  int_array_radix_sort(my_array2, sizeof(my_array)/sizeof(my_array[0]));
   found_needle_idx = int_array_binary_search(
     my_array,
     sizeof(my_array)/sizeof(my_array[0]),
     needle);
   assert(my_array[found_needle_idx] == needle);
+  found_needle_idx = int_array_binary_search(
+    my_array2,
+    sizeof(my_array)/sizeof(my_array[0]),
+    needle);
+  assert(my_array2[found_needle_idx] == needle);
   found_bad_needle_idx = int_array_binary_search(
     my_array,
+    sizeof(my_array)/sizeof(my_array[0]),
+    bad_needle);
+  assert(found_bad_needle_idx < 0);
+  found_bad_needle_idx = int_array_binary_search(
+    my_array2,
     sizeof(my_array)/sizeof(my_array[0]),
     bad_needle);
   assert(found_bad_needle_idx < 0);

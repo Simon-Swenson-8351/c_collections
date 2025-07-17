@@ -39,7 +39,7 @@
   #define DATA_RESULT_DECL(result) DATA_TYPENAME result
   #define DATA_RESULT_RETURN_STMT(result) return (result)
   #ifdef DATA_MOVE
-    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) DATA_MOVE((ptr), (arg))
+    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) (*(ptr) = DATA_MOVE((arg)))
     #define DATA_MOVE_RESULT_FROM_PTR(result, ptr) \
       ((result) = DATA_MOVE(*(ptr)))
   #else
@@ -55,13 +55,11 @@
   #define DATA_RESULT_DECL(result)
   #define DATA_RESULT_RETURN_STMT(result)
   #ifdef DATA_MOVE
-    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) \
-      DATA_MOVE((ptr), (arg))
+    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) DATA_MOVE((ptr), (arg))
     #define DATA_MOVE_RESULT_FROM_PTR(result, ptr) \
       DATA_MOVE((result), (ptr))
   #else
-    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) \
-      (*(ptr) = *(arg))
+    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) (*(ptr) = *(arg))
     #define DATA_MOVE_RESULT_FROM_PTR(result, ptr) \
       (*(result) = *(ptr))
   #endif
@@ -76,7 +74,7 @@
       { \
         for(size_t i = 0; i < (len); i++) \
         { \
-          DATA_MOVE((dest_base)[i], (src_base)[i]); \
+          (dest_base)[i] = DATA_MOVE((src_base)[i]);
         } \
       } while(0)
   #else
@@ -124,7 +122,6 @@
 #endif
 
 #ifdef ALLOC_TYPENAME
-  #define ALLOC_DECL(allocator) ALLOC_TYPENAME *allocator;
   #define ALLOC_ARG(allocator) ALLOC_TYPENAME *allocator,
   #define ALLOC_ASSIGN(lval, rval) ((lval) = (rval))
   #define ALLOC_ASSERT(expr) assert((expr))
@@ -137,7 +134,6 @@
     #define ALLOC_FREE(allocator, ptr_to_free)
   #endif
 #else
-  #define ALLOC_DECL(allocator)
   #define ALLOC_ARG(allocator)
   #define ALLOC_ASSIGN(lval, rval)
   #define ALLOC_ASSERT(expr)
@@ -159,15 +155,6 @@
   #define ARRAY_LIST_NEW_CAP_SET
   #define ARRAY_LIST_NEW_CAP(old_cap) ((old_cap) << 1)
 #endif
-
-#define ARRAY_LIST_STRUCT_DEFN \
-  typedef struct ARRAY_LIST_TYPENAME \
-  { \
-    ALLOC_DECL(allocator) \
-    DATA_TYPENAME *data; \
-    size_t len; \
-    size_t cap; \
-  } ARRAY_LIST_TYPENAME;
 
 #define ARRAY_LIST_INIT_FNNAME COLN_CAT(ARRAY_LIST_TYPENAME, _init)
 #define ARRAY_LIST_INIT_SIGN \
@@ -456,30 +443,57 @@
   }
 
 #ifdef ARRAY_LIST_HEADER
-ARRAY_LIST_STRUCT_DEFN
-ARRAY_LIST_INIT_DECL
-ARRAY_LIST_COPY_DECL
-ARRAY_LIST_MOVE_DECL
-ARRAY_LIST_CLEAR_DECL
-ARRAY_LIST_PUSH_BACK_DECL
-ARRAY_LIST_INSERT_AT_DECL
-ARRAY_LIST_POP_BACK_DECL
-ARRAY_LIST_REMOVE_AT_DECL
-ARRAY_LIST_CAT_DECL
+
+  typedef struct ARRAY_LIST_TYPENAME
+  {
+  #ifdef ALLOC_TYPENAME
+    ALLOC_TYPENAME *allocator;
+  #endif
+    DATA_TYPENAME *data;
+    size_t len;
+    size_t cap;
+  } ARRAY_LIST_TYPENAME;
+
+  ARRAY_LIST_INIT_DECL
+  ARRAY_LIST_COPY_DECL
+  ARRAY_LIST_MOVE_DECL
+  ARRAY_LIST_CLEAR_DECL
+  ARRAY_LIST_PUSH_BACK_DECL
+  ARRAY_LIST_INSERT_AT_DECL
+  ARRAY_LIST_POP_BACK_DECL
+  ARRAY_LIST_REMOVE_AT_DECL
+  ARRAY_LIST_CAT_DECL
 #endif
 
 #ifdef ARRAY_LIST_IMPL
-ARRAY_LIST_EXPAND_DECL
-ARRAY_LIST_INIT_DEFN
-ARRAY_LIST_COPY_DEFN
-ARRAY_LIST_MOVE_DEFN
-ARRAY_LIST_CLEAR_DEFN
-ARRAY_LIST_PUSH_BACK_DEFN
-ARRAY_LIST_INSERT_AT_DEFN
-ARRAY_LIST_POP_BACK_DEFN
-ARRAY_LIST_REMOVE_AT_DEFN
-ARRAY_LIST_CAT_DEFN
-ARRAY_LIST_EXPAND_DEFN
+  ARRAY_LIST_EXPAND_DECL
+
+  ARRAY_LIST_INIT_SIGN
+  {
+    assert(to_init);
+  #ifdef ALLOC_TYPENAME
+    assert(allocator);
+  #endif
+    to_init->data = ALLOC_ALLOC(allocator,
+                                sizeof(DATA_TYPENAME) * to_init->cap);
+    if(!to_init->data) return COLN_RESULT_ALLOC_FAILED;
+  #ifdef ALLOC_TYPENAME
+    to_init->allocator  allocator);
+  #endif
+    to_init->cap = initial_cap;
+    to_init->len = 0;
+    return COLN_RESULT_SUCCESS;
+  }
+
+  ARRAY_LIST_COPY_DEFN
+  ARRAY_LIST_MOVE_DEFN
+  ARRAY_LIST_CLEAR_DEFN
+  ARRAY_LIST_PUSH_BACK_DEFN
+  ARRAY_LIST_INSERT_AT_DEFN
+  ARRAY_LIST_POP_BACK_DEFN
+  ARRAY_LIST_REMOVE_AT_DEFN
+  ARRAY_LIST_CAT_DEFN
+  ARRAY_LIST_EXPAND_DEFN
 #endif
 
 #undef ARRAY_LIST_EXPAND_DEFN
@@ -560,7 +574,6 @@ ARRAY_LIST_EXPAND_DEFN
 #undef ALLOC_ASSERT
 #undef ALLOC_ASSIGN
 #undef ALLOC_ARG
-#undef ALLOC_DECL
 #undef DATA_CLEAR_MANY
 #undef DATA_MOVE_MANY
 #undef DATA_MOVE_PTR_FROM_PTR

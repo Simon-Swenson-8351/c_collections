@@ -50,9 +50,9 @@
       do \
       { \
         DATA_TYPENAME swaptmp; \
-        DATA_MOVE(&swaptmp, *(a)); \
-        DATA_MOVE((a), *(b)); \
-        DATA_MOVE((b), swaptmp); \
+        swaptmp = DATA_MOVE(*(a));\
+        *(a) = DATA_MOVE(*(b)); \
+        *(b) = DATA_MOVE(swaptmp); \
       } while(0)
   #elif defined(DATA_PASS_BY_PTR) 
     #define DATA_SWAP_PTR_PTR(a, b) \
@@ -91,24 +91,6 @@
     ptrdiff_t ARRAY_LINEAR_SEARCH_FNNAME(DATA_TYPENAME *array, \
                                          size_t array_len, \
                                          DATA_ARG(to_find))
-  #define ARRAY_LINEAR_SEARCH_CALL(array, array_len, to_find) \
-    ARRAY_LINEAR_SEARCH_FNNAME((array), (array_len), (to_find))
-  #define ARRAY_LINEAR_SEARCH_DECL ARRAY_LINEAR_SEARCH_SIGN;
-  #define ARRAY_LINEAR_SEARCH_DEFN \
-    ARRAY_LINEAR_SEARCH_SIGN \
-    { \
-      assert(array_len > 0 ? array != NULL : true); \
-      DATA_ASSERT_ARG(to_find); \
-      for(ptrdiff_t i = 0; i < (ptrdiff_t)array_len; i++) \
-        if(DATA_EQUALS_PTR_ARG(array + i, to_find)) return i; \
-      return -1; \
-    }
-#else
-  #define ARRAY_LINEAR_SEARCH_FNNAME
-  #define ARRAY_LINEAR_SEARCH_SIGN
-  #define ARRAY_LINEAR_SEARCH_CALL(array, array_len, to_find)
-  #define ARRAY_LINEAR_SEARCH_DECL
-  #define ARRAY_LINEAR_SEARCH_DEFN
 #endif
 
 #ifdef DATA_COMPARE
@@ -117,78 +99,23 @@
     ptrdiff_t ARRAY_BINARY_SEARCH_FNNAME(DATA_TYPENAME *array, \
                                          size_t array_len, \
                                          DATA_ARG(to_find))
-  #define ARRAY_BINARY_SEARCH_CALL(array, array_len, to_find) \
-    ARRAY_BINARY_SEARCH_FNNAME((array), (array_len), (to_find))
-  #define ARRAY_BINARY_SEARCH_DECL ARRAY_BINARY_SEARCH_SIGN;
-  #define ARRAY_BINARY_SEARCH_DEFN \
-    ARRAY_BINARY_SEARCH_SIGN \
-    { \
-      assert(array_len > 0 ? array != NULL : true); \
-      DATA_ASSERT_ARG(to_find); \
-      ARRAY_ASSERT_SORTED_CALL(array, array_len); \
-      ptrdiff_t left = 0; \
-      ptrdiff_t right = array_len; \
-      while(left < right) \
-      { \
-        ptrdiff_t mid = left + ((right - left) >> 1); \
-        int cmp_res = DATA_COMPARE_PTR_ARG(array + mid, to_find); \
-        if(cmp_res > 0) right = mid; \
-        else if(cmp_res == 0) return mid; \
-        else left = mid + 1; \
-      } \
-      return -1; \
-    }
 
   #define ARRAY_QUICK_SORT_FNNAME COLN_CAT(ARRAY_TYPENAME, _quick_sort)
   #define ARRAY_QUICK_SORT_SIGN \
     void ARRAY_QUICK_SORT_FNNAME(DATA_TYPENAME *array, size_t array_len)
-  #define ARRAY_QUICK_SORT_CALL(array, array_len) \
-    ARRAY_QUICK_SORT_FNNAME((array), (array_len))
-  #define ARRAY_QUICK_SORT_DECL ARRAY_QUICK_SORT_SIGN;
-  #define ARRAY_QUICK_SORT_DEFN \
-    ARRAY_QUICK_SORT_SIGN \
-    { \
-      if(array_len < 2) return; \
-      ptrdiff_t pivot_idx = array_len >> 1; \
-      if(pivot_idx != (ptrdiff_t)array_len - 1) \
-        DATA_SWAP_PTR_PTR(array + pivot_idx, array + array_len - 1); \
-      pivot_idx = array_len - 1; \
-      ptrdiff_t left_top = 0; \
-      ptrdiff_t right_bot = pivot_idx; \
-      while(left_top != right_bot) \
-      { \
-        int cmp_res = DATA_COMPARE_PTR_PTR(array + left_top, \
-                                                           array + pivot_idx); \
-        if(cmp_res > 0) \
-        { \
-          right_bot--; \
-          DATA_SWAP_PTR_PTR(array + left_top, array + right_bot); \
-        } \
-        else \
-        { \
-          left_top++; \
-        } \
-      } \
-      if(pivot_idx != right_bot) \
-      { \
-        DATA_SWAP_PTR_PTR(array + pivot_idx, array + right_bot); \
-      } \
-      right_bot++; \
-      ARRAY_QUICK_SORT_CALL(array, left_top); \
-      ARRAY_QUICK_SORT_CALL(array + right_bot, array_len - right_bot); \
-    }
-#else
-  #define ARRAY_BINARY_SEARCH_FNNAME
-  #define ARRAY_BINARY_SEARCH_SIGN
-  #define ARRAY_BINARY_SEARCH_CALL(array, array_len, to_find)
-  #define ARRAY_BINARY_SEARCH_DECL
-  #define ARRAY_BINARY_SEARCH_DEFN
+#endif
 
-  #define ARRAY_QUICK_SORT_FNNAME
-  #define ARRAY_QUICK_SORT_SIGN
-  #define ARRAY_QUICK_SORT_CALL(array, array_len)
-  #define ARRAY_QUICK_SORT_DECL
-  #define ARRAY_QUICK_SORT_DEFN
+#if defined(DATA_DIGIT_LEN) && defined(DATA_DIGIT)
+  #define ARRAY_RADIX_SORT_RECURSIVE_FNNAME \
+    COLN_CAT(ARRAY_TYPENAME, _radix_sort_recursive)
+  #define ARRAY_RADIX_SORT_RECURSIVE_SIGN \
+    void ARRAY_RADIX_SORT_RECURSIVE_FNNAME(DATA_TYPENAME *base, \
+                                           size_t len, \
+                                           int digit)
+
+  #define ARRAY_RADIX_SORT_FNNAME COLN_CAT(ARRAY_TYPENAME, _radix_sort)
+  #define ARRAY_RADIX_SORT_SIGN \
+    void ARRAY_RADIX_SORT_FNNAME(DATA_TYPENAME *array, size_t array_len)
 #endif
 
 #if defined(DATA_COMPARE) && !defined(NDEBUG)
@@ -196,61 +123,154 @@
   #define ARRAY_ASSERT_SORTED_SIGN \
     static void ARRAY_ASSERT_SORTED_FNNAME(DATA_TYPENAME *array, \
                                                   size_t array_len)
-  #define ARRAY_ASSERT_SORTED_CALL(array, array_len) \
-    ARRAY_ASSERT_SORTED_FNNAME((array), (array_len))
-  #define ARRAY_ASSERT_SORTED_DECL ARRAY_ASSERT_SORTED_SIGN;
-  #define ARRAY_ASSERT_SORTED_DEFN \
-    ARRAY_ASSERT_SORTED_SIGN \
-    { \
-      assert(array_len > 0 ? array != NULL : true); \
-      for(ptrdiff_t i = 1; i < (ptrdiff_t)array_len; i++) \
-        assert(DATA_COMPARE_PTR_PTR(array + i - 1, array + i) < 0); \
-    }
-#else
-  #define ARRAY_ASSERT_SORTED_FNNAME
-  #define ARRAY_ASSERT_SORTED_SIGN
-  #define ARRAY_ASSERT_SORTED_CALL(array, array_len)
-  #define ARRAY_ASSERT_SORTED_DECL
-  #define ARRAY_ASSERT_SORTED_DEFN
 #endif
 
 #ifdef ARRAY_HEADER
-ARRAY_LINEAR_SEARCH_DECL
-ARRAY_BINARY_SEARCH_DECL
-ARRAY_QUICK_SORT_DECL
+
+  #ifdef DATA_EQUALS
+    ARRAY_LINEAR_SEARCH_SIGN;
+  #endif
+
+  #ifdef DATA_COMPARE
+    ARRAY_BINARY_SEARCH_SIGN;
+    ARRAY_QUICK_SORT_SIGN;
+  #endif
+
+  #if defined(DATA_DIGIT_LEN) && defined(DATA_DIGIT)
+    ARRAY_RADIX_SORT_SIGN;
+  #endif
+
 #endif
 
 #ifdef ARRAY_IMPL
-ARRAY_ASSERT_SORTED_DECL
-ARRAY_LINEAR_SEARCH_DEFN
-ARRAY_BINARY_SEARCH_DEFN
-ARRAY_QUICK_SORT_DEFN
-ARRAY_ASSERT_SORTED_DEFN
+  
+  #if defined(DATA_COMPARE) && !defined(NDEBUG)
+    ARRAY_ASSERT_SORTED_SIGN;
+  #endif
+
+  #if defined(DATA_DIGIT_LEN) && defined(DATA_DIGIT)
+    ARRAY_RADIX_SORT_RECURSIVE_SIGN;
+  #endif
+
+  #ifdef DATA_EQUALS
+    ARRAY_LINEAR_SEARCH_SIGN
+    {
+      assert(array_len > 0 ? array != NULL : true);
+    #ifdef DATA_PASS_BY_PTR
+      DATA_ASSERT_ARG(to_find);
+    #endif
+      for(ptrdiff_t i = 0; i < (ptrdiff_t)array_len; i++)
+        if(DATA_EQUALS_PTR_ARG(array + i, to_find)) return i;
+      return -1;
+    }
+  #endif
+
+  #ifdef DATA_COMPARE
+    ARRAY_BINARY_SEARCH_SIGN
+    {
+      assert(array_len > 0 ? array != NULL : true);
+    #ifdef DATA_PASS_BY_PTR
+      DATA_ASSERT_ARG(to_find);
+    #endif
+      ARRAY_ASSERT_SORTED_FNNAME(array, array_len);
+      ptrdiff_t left = 0;
+      ptrdiff_t right = array_len;
+      while(left < right)
+      {
+        ptrdiff_t mid = left + ((right - left) >> 1);
+        int cmp_res = DATA_COMPARE_PTR_ARG(array + mid, to_find);
+        if(cmp_res > 0) right = mid;
+        else if(cmp_res == 0) return mid;
+        else left = mid + 1;
+      }
+      return -1;
+    }
+
+    ARRAY_QUICK_SORT_SIGN
+    {
+      if(array_len < 2) return;
+      ptrdiff_t pivot_idx = array_len >> 1;
+      if(pivot_idx != (ptrdiff_t)array_len - 1)
+        DATA_SWAP_PTR_PTR(array + pivot_idx, array + array_len - 1);
+      pivot_idx = array_len - 1;
+      ptrdiff_t left_top = 0;
+      ptrdiff_t right_bot = pivot_idx;
+      while(left_top != right_bot)
+      {
+        int cmp_res = DATA_COMPARE_PTR_PTR(array + left_top, array + pivot_idx);
+        if(cmp_res > 0)
+        {
+          right_bot--;
+          DATA_SWAP_PTR_PTR(array + left_top, array + right_bot);
+        }
+        else
+        {
+          left_top++;
+        }
+      }
+      if(pivot_idx != right_bot)
+        DATA_SWAP_PTR_PTR(array + pivot_idx, array + right_bot);
+      right_bot++;
+      ARRAY_QUICK_SORT_FNNAME(array, left_top);
+      ARRAY_QUICK_SORT_FNNAME(array + right_bot, array_len - right_bot);
+    }
+  #endif
+
+  #if defined(DATA_DIGIT_LEN) && defined(DATA_DIGIT)
+    ARRAY_RADIX_SORT_RECURSIVE_SIGN
+    {
+      if(len < 2) return;
+      if(digit < 0) return;
+      size_t low = 0;
+      size_t high = len;
+      while(low < high)
+      {
+      #if defined(DATA_PASS_BY_VAL)
+        if(DATA_DIGIT(base[low], (unsigned int)digit))
+      #elif defined(DATA_PASS_BY_PTR)
+        if(DATA_DIGIT(base + low, (unsigned int)digit))
+      #endif
+        {
+          if(low < high - 1) DATA_SWAP_PTR_PTR(base + low, base + high - 1);
+          high--;
+        }
+        else
+        {
+          low++;
+        }
+      }
+      ARRAY_RADIX_SORT_RECURSIVE_FNNAME(base, low, digit - 1);
+      ARRAY_RADIX_SORT_RECURSIVE_FNNAME(base + low, len - low, digit - 1);
+    }
+
+    ARRAY_RADIX_SORT_SIGN
+    {
+      ARRAY_RADIX_SORT_RECURSIVE_FNNAME(array, array_len, DATA_DIGIT_LEN - 1);
+    }
+  #endif
+
+  #if defined(DATA_COMPARE) && !defined(NDEBUG)
+    ARRAY_ASSERT_SORTED_SIGN
+    {
+      assert(array_len > 0 ? array != NULL : true);
+      for(size_t i = 1; i < array_len; i++)
+        assert(DATA_COMPARE_PTR_PTR(array + i - 1, array + i) < 0);
+    }
+  #endif
 #endif
 
 #undef ARRAY_ASSERT_SORTED_FNNAME
 #undef ARRAY_ASSERT_SORTED_SIGN
-#undef ARRAY_ASSERT_SORTED_CALL
-#undef ARRAY_ASSERT_SORTED_DECL
-#undef ARRAY_ASSERT_SORTED_DEFN
-
+#undef ARRAY_RADIX_SORT_RECURSIVE_FNNAME
+#undef ARRAY_RADIX_SORT_RECURSIVE_SIGN
+#undef ARRAY_RADIX_SORT_FNNAME
+#undef ARRAY_RADIX_SORT_SIGN
 #undef ARRAY_QUICK_SORT_FNNAME
 #undef ARRAY_QUICK_SORT_SIGN
-#undef ARRAY_QUICK_SORT_CALL
-#undef ARRAY_QUICK_SORT_DECL
-#undef ARRAY_QUICK_SORT_DEFN
-
 #undef ARRAY_BINARY_SEARCH_FNNAME
 #undef ARRAY_BINARY_SEARCH_SIGN
-#undef ARRAY_BINARY_SEARCH_CALL
-#undef ARRAY_BINARY_SEARCH_DECL
-#undef ARRAY_BINARY_SEARCH_DEFN
-
 #undef ARRAY_LINEAR_SEARCH_FNNAME
 #undef ARRAY_LINEAR_SEARCH_SIGN
-#undef ARRAY_LINEAR_SEARCH_CALL
-#undef ARRAY_LINEAR_SEARCH_DECL
-#undef ARRAY_LINEAR_SEARCH_DEFN
 
 #ifdef ARRAY_TYPENAME_SET
 #undef ARRAY_TYPENAME_SET
