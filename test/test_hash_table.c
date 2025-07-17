@@ -1,15 +1,15 @@
-#define COLN_DATA_TYPENAME int
-#define COLN_DATA_HASH(x) ((size_t)(*x))
-#define COLN_HEADER
-#define COLN_IMPL
-#define COLN_INTERNAL_DEBUG
+#define DATA_TYPENAME int
+#define DATA_PASS_BY_VAL
+#define DATA_HASH(x) ((size_t)(*x))
+#define HASH_TABLE_HEADER
+#define HASH_TABLE_IMPL
 
 #include "hash_table.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
-#undef COLN_DATA_HASH
-#undef COLN_DATA_TYPENAME
+#undef HASH_TABLE_IMPL
+#undef HASH_TABLE_HEADER
+#undef DATA_HASH
+#undef DATA_TYPENAME
 
 #include <stdio.h>
 #include <string.h>

@@ -45,16 +45,16 @@
 #endif
 
 #ifdef DATA_MOVE
-  #ifdef DATA_PASS_BY_VAL
+  #if defined(DATA_PASS_BY_VAL)
     #define DATA_SWAP_PTR_PTR(a, b) \
       do \
       { \
         DATA_TYPENAME swaptmp; \
-        swaptmp = DATA_MOVE(*(a)); \
-        *(a) = DATA_MOVE(*(b)); \
-        *(b) = DATA_MOVE(swaptmp); \
+        DATA_MOVE(&swaptmp, *(a)); \
+        DATA_MOVE((a), *(b)); \
+        DATA_MOVE((b), swaptmp); \
       } while(0)
-  #else 
+  #elif defined(DATA_PASS_BY_PTR) 
     #define DATA_SWAP_PTR_PTR(a, b) \
       do \
       { \

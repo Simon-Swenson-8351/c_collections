@@ -1,60 +1,60 @@
 #include "test_common.c"
 
-#define COLN_DATA_TYPENAME int
-#define COLN_DATA_PASS_BY_VAL
-#define COLN_DATA_COMPARE int_compare
+#define DATA_TYPENAME int
+#define DATA_PASS_BY_VAL
+#define DATA_COMPARE int_compare
 #define RB_TREE_TYPENAME int_red_black_tree
-#define COLN_HEADER
-#define COLN_IMPL
+#define RB_TREE_HEADER
+#define RB_TREE_IMPL
 
 #include "rb_tree.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
+#undef RB_TREE_IMPL
+#undef RB_TREE_HEADER
 #undef RB_TREE_TYPENAME
-#undef COLN_DATA_COMPARE
-#undef COLN_DATA_PASS_BY_VAL
-#undef COLN_DATA_TYPENAME
+#undef DATA_COMPARE
+#undef DATA_PASS_BY_VAL
+#undef DATA_TYPENAME
 
-#define COLN_DATA_TYPENAME int
-#define COLN_DATA_PASS_BY_VAL
-#define COLN_DATA_COMPARE int_compare
-#define COLN_ALLOC_TYPENAME dynamic_slot_allocator
-#define COLN_ALLOC dynamic_slot_allocator_alloc
-#define COLN_FREE dynamic_slot_allocator_free
+#define DATA_TYPENAME int
+#define DATA_PASS_BY_VAL
+#define DATA_COMPARE int_compare
+#define ALLOC_TYPENAME dynamic_slot_allocator
+#define ALLOC_ALLOC dynamic_slot_allocator_alloc
+#define ALLOC_FREE dynamic_slot_allocator_free
 #define RB_TREE_TYPENAME int_slot_allocd_red_black_tree
-#define COLN_HEADER
-#define COLN_IMPL
+#define RB_TREE_HEADER
+#define RB_TREE_IMPL
 
 #include "rb_tree.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
+#undef RB_TREE_IMPL
+#undef RB_TREE_HEADER
 #undef RB_TREE_TYPENAME
-#undef COLN_FREE
-#undef COLN_ALLOC
-#undef COLN_ALLOC_TYPENAME
-#undef COLN_DATA_COMPARE
-#undef COLN_DATA_PASS_BY_VAL
-#undef COLN_DATA_TYPENAME
+#undef ALLOC_FREE
+#undef ALLOC_ALLOC
+#undef ALLOC_TYPENAME
+#undef DATA_COMPARE
+#undef DATA_PASS_BY_VAL
+#undef DATA_TYPENAME
 
-#define COLN_DATA_TYPENAME dyn_str
-#define COLN_DATA_PASS_BY_PTR
-#define COLN_DATA_COPY dyn_str_copy
-#define COLN_DATA_CLEAR dyn_str_clear
-#define COLN_DATA_COMPARE dyn_str_cmp
-#define COLN_HEADER
-#define COLN_IMPL
+#define DATA_TYPENAME dyn_str
+#define DATA_PASS_BY_PTR
+#define DATA_COPY dyn_str_copy
+#define DATA_CLEAR dyn_str_clear
+#define DATA_COMPARE dyn_str_cmp
+#define RB_TREE_HEADER
+#define RB_TREE_IMPL
 
 #include "rb_tree.t.h"
 
-#undef COLN_IMPL
-#undef COLN_HEADER
-#undef COLN_DATA_COMPARE
-#undef COLN_DATA_CLEAR
-#undef COLN_DATA_COPY
-#undef COLN_DATA_PASS_BY_PTR
-#undef COLN_DATA_TYPENAME
+#undef RB_TREE_IMPL
+#undef RB_TREE_HEADER
+#undef DATA_COMPARE
+#undef DATA_CLEAR
+#undef DATA_COPY
+#undef DATA_PASS_BY_PTR
+#undef DATA_TYPENAME
 
 // for test purposes, this ensures that the header usage of the collection .t.h 
 // is isolated from the header usage of the tests
@@ -613,6 +613,33 @@ TEST_RM(
         node(6, RB_NODE_COLOR_BLACK, NULL, NULL)),
     COLN_RESULT_SUCCESS)
 
+int test_with_allocator(void)
+{
+  dynamic_slot_allocator alloc;
+  if(!dynamic_slot_allocator_init(&alloc, 
+                                  sizeof(int_slot_allocd_red_black_tree_node),
+                                  4))
+    return 1;
+  int_slot_allocd_red_black_tree tree;
+  int_slot_allocd_red_black_tree_init(&tree, &alloc);
+  int_slot_allocd_red_black_tree_insert(&tree, 11);
+  int_slot_allocd_red_black_tree_insert(&tree, 2);
+  int_slot_allocd_red_black_tree_insert(&tree, 5);
+  int_slot_allocd_red_black_tree_insert(&tree, 3);
+  int_slot_allocd_red_black_tree_insert(&tree, 7);
+  if(alloc.used != 5) return 1;
+  int_slot_allocd_red_black_tree tree2;
+  int_slot_allocd_red_black_tree_copy(&tree2, &tree);
+  if(alloc.used != 10) return 1;
+  int_slot_allocd_red_black_tree_remove(&tree2, 5, NULL);
+  if(alloc.used != 9) return 1;
+  int_slot_allocd_red_black_tree_clear(&tree);
+  if(alloc.used != 4) return 1;
+  int_slot_allocd_red_black_tree_clear(&tree2);
+  dynamic_slot_allocator_clear(&alloc);
+  return 0;
+}
+
 struct test_case
 {
     char const *name;
@@ -647,6 +674,7 @@ struct test_case TEST_CASES[] =
     TEST_CASE(test_rm_blk_leaf_selfleft_parentblack_siblingblack_cousinleftred_cousinrightblack),
     TEST_CASE(test_rm_blk_leaf_selfright_parentblack_siblingblack_cousinleftred_cousinrightblack),
     TEST_CASE(test_rm_blk_leaf_selfleft_siblingred),
+    TEST_CASE(test_with_allocator),
     TEST_CASE(test_random)
 };
 

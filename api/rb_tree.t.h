@@ -9,104 +9,107 @@
 #define COLN_CAT_(a, b) a ## b
 #define COLN_CAT(a, b) COLN_CAT_(a, b)
 
-#ifdef COLN_INTERNAL_DEBUG
+#ifndef COLN_INTERNAL_NDEBUG
   #define COLN_INTERNAL_ASSERT(x) assert(x)
 #else
   #define COLN_INTERNAL_ASSERT(x)
 #endif
 
-#if !defined(COLN_HEADER) && !defined(COLN_IMPL)
-  #error "COLN_HEADER or COLN_IMPL must be defined"
+#if !defined(RB_TREE_HEADER) && !defined(RB_TREE_IMPL)
+  #error "RB_TREE_HEADER or RB_TREE_IMPL must be defined"
 #endif
 
-#ifndef COLN_DATA_TYPENAME
-  #error "Collection macros require COLN_DATA_TYPENAME"
+#ifndef DATA_TYPENAME
+  #error "Collection macros require DATA_TYPENAME"
 #endif
 
-#if !defined(COLN_DATA_PASS_BY_VAL) && !defined(COLN_DATA_PASS_BY_PTR)
-  #error "Define either COLN_DATA_PASS_BY_VAL or COLN_DATA_PASS_BY_PTR"
+#if !defined(DATA_PASS_BY_VAL) && !defined(DATA_PASS_BY_PTR)
+  #error "Define either DATA_PASS_BY_VAL or DATA_PASS_BY_PTR"
 #endif
 
-#if defined(COLN_DATA_PASS_BY_VAL) && defined(COLN_DATA_PASS_BY_PTR)
-  #error "Define only one of COLN_DATA_PASS_BY_VAL or COLN_DATA_PASS_BY_PTR"
+#if defined(DATA_PASS_BY_VAL) && defined(DATA_PASS_BY_PTR)
+  #error "Define only one of DATA_PASS_BY_VAL or DATA_PASS_BY_PTR"
 #endif
 
-#ifndef COLN_DATA_COMPARE
-  #error "Red-black Tree requires a compare function"
+#ifndef DATA_COMPARE
+  #error "Red-black Tree requires a compare function or macro, DATA_COMPARE, "
+    "with a signature of [int DATA_COMPARE(DATA_TYPENAME, DATA_TYPENAME)] or " \
+    "[int DATA_COMPARE(DATA_TYPENAME *, DATA_TYPENAME *)] depending on the " \
+    "specified passing semantics"
 #endif
 
-#if defined(COLN_DATA_PASS_BY_VAL)
-  #define COLN_DATA_ARG(arg_name) COLN_DATA_TYPENAME arg_name
-  #define COLN_DATA_ASSERT_ARG(arg_name)
-  #ifdef COLN_DATA_MOVE
-    #define COLN_DATA_MOVE_VAL_FROM_ARG(val, arg) \
-      ((val) = COLN_DATA_MOVE((arg)))
+#if defined(DATA_PASS_BY_VAL)
+  #define DATA_ARG(arg_name) DATA_TYPENAME arg_name
+  #define DATA_ASSERT_ARG(arg_name)
+  #ifdef DATA_MOVE
+    #define DATA_MOVE_VAL_FROM_ARG(val, arg) \
+      ((val) = DATA_MOVE((arg)))
   #else
-    #define COLN_DATA_MOVE_VAL_FROM_ARG(val, arg) \
+    #define DATA_MOVE_VAL_FROM_ARG(val, arg) \
       ((val) = (arg))
   #endif
-  #define COLN_DATA_COMPARE_VAL_VAL(a, b) COLN_DATA_COMPARE((a), (b))
-  #define COLN_DATA_COMPARE_VAL_ARG(val, arg) COLN_DATA_COMPARE((val), (arg))
-#elif defined(COLN_DATA_PASS_BY_PTR)
-  #define COLN_DATA_ARG(arg_name) COLN_DATA_TYPENAME *arg_name
-  #define COLN_DATA_ASSERT_ARG(arg_name) assert(arg_name)
-  #ifdef COLN_DATA_MOVE
-    #define COLN_DATA_MOVE_VAL_FROM_ARG(val, arg) \
-      COLN_DATA_MOVE(&(val), (arg))
+  #define DATA_COMPARE_VAL_VAL(a, b) DATA_COMPARE((a), (b))
+  #define DATA_COMPARE_VAL_ARG(val, arg) DATA_COMPARE((val), (arg))
+#elif defined(DATA_PASS_BY_PTR)
+  #define DATA_ARG(arg_name) DATA_TYPENAME *arg_name
+  #define DATA_ASSERT_ARG(arg_name) assert(arg_name)
+  #ifdef DATA_MOVE
+    #define DATA_MOVE_VAL_FROM_ARG(val, arg) \
+      DATA_MOVE(&(val), (arg))
   #else
-    #define COLN_DATA_MOVE_VAL_FROM_ARG(val, arg) \
+    #define DATA_MOVE_VAL_FROM_ARG(val, arg) \
       ((val) = *(arg))
   #endif
-  #define COLN_DATA_COMPARE_VAL_VAL(a, b) COLN_DATA_COMPARE(&(a), &(b))
-  #define COLN_DATA_COMPARE_VAL_ARG(val, arg) COLN_DATA_COMPARE(&(val), (arg))
+  #define DATA_COMPARE_VAL_VAL(a, b) DATA_COMPARE(&(a), &(b))
+  #define DATA_COMPARE_VAL_ARG(val, arg) DATA_COMPARE(&(val), (arg))
 #endif
 
-#ifdef COLN_DATA_MOVE
-  #define COLN_DATA_MOVE_PTR_FROM_VAL(ptr, val) COLN_DATA_MOVE((ptr), &(val))
-  #define COLN_DATA_MOVE_VAL_FROM_VAL(dest_val, src_val) \
-    COLN_DATA_MOVE(&(dest_val), &(src_val))
+#ifdef DATA_MOVE
+  #define DATA_MOVE_PTR_FROM_VAL(ptr, val) DATA_MOVE((ptr), &(val))
+  #define DATA_MOVE_VAL_FROM_VAL(dest_val, src_val) \
+    DATA_MOVE(&(dest_val), &(src_val))
 #else
-  #define COLN_DATA_MOVE_PTR_FROM_VAL(ptr, val) (*(ptr) = (val))
-  #define COLN_DATA_MOVE_VAL_FROM_VAL(dest_val, src_val) \
+  #define DATA_MOVE_PTR_FROM_VAL(ptr, val) (*(ptr) = (val))
+  #define DATA_MOVE_VAL_FROM_VAL(dest_val, src_val) \
     ((dest_val) = (src_val))
 #endif
 
-#ifdef COLN_DATA_CLEAR
-  #if defined(COLN_DATA_PASS_BY_VAL)
-    #define COLN_DATA_CLEAR_VAL(val_to_clear) COLN_DATA_CLEAR((val_to_clear))
-  #elif defined(COLN_DATA_PASS_BY_PTR)
-    #define COLN_DATA_CLEAR_VAL(val_to_clear) COLN_DATA_CLEAR(&(val_to_clear))
+#ifdef DATA_CLEAR
+  #if defined(DATA_PASS_BY_VAL)
+    #define DATA_CLEAR_VAL(val_to_clear) DATA_CLEAR((val_to_clear))
+  #elif defined(DATA_PASS_BY_PTR)
+    #define DATA_CLEAR_VAL(val_to_clear) DATA_CLEAR(&(val_to_clear))
   #endif
 #else
-  #define COLN_DATA_CLEAR_VAL(val_to_clear)
+  #define DATA_CLEAR_VAL(val_to_clear)
 #endif
 
-#ifdef COLN_ALLOC_TYPENAME
-  #define COLN_ALLOC_DECL(allocator) COLN_ALLOC_TYPENAME *allocator;
-  #define COLN_ALLOC_ARG(allocator) , COLN_ALLOC_TYPENAME *allocator
-  #define COLN_ALLOC_ASSIGN(lval, rval) ((lval) = (rval))
-  #define COLN_ALLOC_ASSERT(expr) assert(expr)
-  #ifndef COLN_ALLOC
+#ifdef ALLOC_TYPENAME
+  #define ALLOC_DECL(allocator) ALLOC_TYPENAME *allocator;
+  #define ALLOC_ARG(allocator) , ALLOC_TYPENAME *allocator
+  #define ALLOC_ASSIGN(lval, rval) ((lval) = (rval))
+  #define ALLOC_ASSERT(expr) assert(expr)
+  #ifndef ALLOC_ALLOC
     #error "Collection macros require an allocation function if an allocator " \
       "type is defined."
   #endif
-  #ifndef COLN_FREE
-    #define COLN_FREE(allocator, ptr_to_free)
+  #ifndef ALLOC_FREE
+    #define ALLOC_FREE(allocator, ptr_to_free)
   #endif
 #else
-  #define COLN_ALLOC_DECL(allocator)
-  #define COLN_ALLOC_ARG(allocator)
-  #define COLN_ALLOC_ASSIGN(lval, rval)
-  #define COLN_ALLOC_ASSERT(expr)
-  #define COLN_ALLOC_SET
-  #define COLN_ALLOC(allocator, size_to_alloc) malloc(size_to_alloc)
-  #define COLN_FREE_SET
-  #define COLN_FREE(allocator, ptr_to_free) free(ptr_to_free)
+  #define ALLOC_DECL(allocator)
+  #define ALLOC_ARG(allocator)
+  #define ALLOC_ASSIGN(lval, rval)
+  #define ALLOC_ASSERT(expr)
+  #define ALLOC_ALLOC_SET
+  #define ALLOC_ALLOC(allocator, size_to_alloc) malloc(size_to_alloc)
+  #define ALLOC_FREE_SET
+  #define ALLOC_FREE(allocator, ptr_to_free) free(ptr_to_free)
 #endif
 
 #ifndef RB_TREE_TYPENAME
   #define RB_TREE_TYPENAME_SET
-  #define RB_TREE_TYPENAME COLN_CAT(COLN_DATA_TYPENAME, _rb_tree)
+  #define RB_TREE_TYPENAME COLN_CAT(DATA_TYPENAME, _rb_tree)
 #endif
 
 
@@ -117,21 +120,21 @@
     struct RB_NODE_TYPENAME *parent; \
     struct RB_NODE_TYPENAME *children[2]; \
     int color; \
-    COLN_DATA_TYPENAME data; \
+    DATA_TYPENAME data; \
   } RB_NODE_TYPENAME;
 
 #define RB_TREE_STRUCT_DEFN \
   typedef struct RB_TREE_TYPENAME \
   { \
-    COLN_ALLOC_DECL(allocator) \
+    ALLOC_DECL(allocator) \
     RB_NODE_TYPENAME *root; \
   } RB_TREE_TYPENAME;
 
 #define RB_TREE_INIT_FNNAME COLN_CAT(RB_TREE_TYPENAME, _init)
 #define RB_TREE_INIT_SIGN \
     void RB_TREE_INIT_FNNAME(RB_TREE_TYPENAME *to_init \
-                             COLN_ALLOC_ARG(allocator))
-#ifdef COLN_ALLOC_TYPENAME
+                             ALLOC_ARG(allocator))
+#ifdef ALLOC_TYPENAME
   #define RB_TREE_INIT_CALL(to_init_ptr, allocator) \
     RB_TREE_INIT_FNNAME((to_init_ptr), (allocator))
 #else
@@ -143,12 +146,12 @@
   RB_TREE_INIT_SIGN \
   { \
     assert(to_init); \
-    COLN_ALLOC_ASSERT(allocator); \
-    COLN_ALLOC_ASSIGN(to_init->allocator, allocator); \
+    ALLOC_ASSERT(allocator); \
+    ALLOC_ASSIGN(to_init->allocator, allocator); \
     to_init->root = NULL; \
   }
 
-#ifdef COLN_DATA_NO_COPY
+#ifdef DATA_NO_COPY
   #define RB_TREE_COPY_FNNAME
   #define RB_TREE_COPY_SIGN
   #define RB_TREE_COPY_CALL(dest_ptr, src_ptr)
@@ -175,7 +178,7 @@
     { \
       assert(dest); \
       assert(src); \
-      COLN_ALLOC_ASSIGN(dest->allocator, src->allocator); \
+      ALLOC_ASSIGN(dest->allocator, src->allocator); \
       coln_result result; \
       RB_NODE_TYPENAME *new_node; \
       if((result = RB_NODE_COPY_CALL(&new_node, \
@@ -186,9 +189,9 @@
       return COLN_RESULT_SUCCESS; \
     }
 
-  #ifdef COLN_DATA_COPY
+  #ifdef DATA_COPY
     #define RB_NODE_COPY_COPY_DATA_SNIPPET \
-      if(!COLN_DATA_COPY(&((*new_dest)->data), &(src->data))) \
+      if(!DATA_COPY(&((*new_dest)->data), &(src->data))) \
       { \
         result = COLN_RESULT_COPY_ELEM_FAILED; \
         goto fail_on_elem_cp; \
@@ -202,8 +205,8 @@
   #define RB_NODE_COPY_SIGN \
     static coln_result RB_NODE_COPY_FNNAME(RB_NODE_TYPENAME **new_dest, \
                                            RB_NODE_TYPENAME *src \
-                                           COLN_ALLOC_ARG(allocator))
-  #ifdef COLN_ALLOC_TYPENAME
+                                           ALLOC_ARG(allocator))
+  #ifdef ALLOC_TYPENAME
     #define RB_NODE_COPY_CALL(new_dest_ptr_ptr, src_ptr, allocator) \
       RB_NODE_COPY_FNNAME((new_dest_ptr_ptr), (src_ptr), (allocator))
   #else
@@ -215,15 +218,14 @@
     RB_NODE_COPY_SIGN \
     { \
       COLN_INTERNAL_ASSERT(new_dest); \
-      COLN_INTERNAL_ASSERT(src); \
-      COLN_ALLOC_ASSERT(allocator); \
+      ALLOC_ASSERT(allocator); \
       if(!src) \
       { \
         *new_dest = NULL; \
         return COLN_RESULT_SUCCESS; \
       } \
       coln_result result; \
-      *new_dest = COLN_ALLOC(allocator, sizeof(RB_NODE_TYPENAME)); \
+      *new_dest = ALLOC_ALLOC(allocator, sizeof(RB_NODE_TYPENAME)); \
       if(!(*new_dest)) \
       { \
         result = COLN_RESULT_ALLOC_FAILED; \
@@ -244,11 +246,11 @@
       RB_NODE_DESTROY_CALL(LEFT_CHILD(*new_dest), \
                            allocator); \
     fail_on_left: \
-      COLN_DATA_CLEAR_VAL((*new_dest)->data); \
+      DATA_CLEAR_VAL((*new_dest)->data); \
     /* The reason for using this label snippet is to shut a compiler */ \
     /* warning up. */ \
     RB_NODE_COPY_FAIL_ON_ELEM_CP_LABEL_SNIPPET \
-      COLN_FREE(allocator, *new_dest); \
+      ALLOC_FREE(allocator, *new_dest); \
       *new_dest = NULL; \
     fail_on_alloc: \
       return result; \
@@ -267,8 +269,8 @@
 #define RB_NODE_DESTROY_FNNAME COLN_CAT(RB_NODE_TYPENAME, _destroy)
 #define RB_NODE_DESTROY_SIGN \
   static void RB_NODE_DESTROY_FNNAME(RB_NODE_TYPENAME *to_destroy \
-                                     COLN_ALLOC_ARG(allocator))
-#ifdef COLN_ALLOC_TYPENAME
+                                     ALLOC_ARG(allocator))
+#ifdef ALLOC_TYPENAME
   #define RB_NODE_DESTROY_CALL(to_destroy, allocator) \
     RB_NODE_DESTROY_FNNAME((to_destroy), (allocator))
 #else
@@ -282,14 +284,14 @@
         if(!to_destroy) return; \
         RB_NODE_DESTROY_CALL(LEFT_CHILD(to_destroy), allocator); \
         RB_NODE_DESTROY_CALL(RIGHT_CHILD(to_destroy), allocator); \
-        COLN_DATA_CLEAR_VAL(to_destroy->data); \
-        COLN_FREE(allocator, to_destroy); \
+        DATA_CLEAR_VAL(to_destroy->data); \
+        ALLOC_FREE(allocator, to_destroy); \
     }
 
 #define RB_TREE_INSERT_FNNAME COLN_CAT(RB_TREE_TYPENAME, _insert)
 #define RB_TREE_INSERT_SIGN \
     coln_result RB_TREE_INSERT_FNNAME(RB_TREE_TYPENAME *tree, \
-                                      COLN_DATA_ARG(to_insert))
+                                      DATA_ARG(to_insert))
 #define RB_TREE_INSERT_CALL(tree_ptr, to_insert) \
   RB_TREE_INSERT_FNNAME((tree_ptr), (to_insert_val))
 #define RB_TREE_INSERT_DECL RB_TREE_INSERT_SIGN;
@@ -297,19 +299,19 @@
   RB_TREE_INSERT_SIGN \
   { \
     assert(tree); \
-    COLN_DATA_ASSERT_ARG(to_insert); \
+    DATA_ASSERT_ARG(to_insert); \
     RB_NODE_TYPENAME *node_to_insert = \
-      COLN_ALLOC(tree->allocator, sizeof(RB_NODE_TYPENAME)); \
+      ALLOC_ALLOC(tree->allocator, sizeof(RB_NODE_TYPENAME)); \
     if(!node_to_insert) return COLN_RESULT_ALLOC_FAILED; \
     memset(node_to_insert->children, 0, sizeof(node_to_insert->children)); \
     node_to_insert->color = RB_NODE_COLOR_RED; \
-    COLN_DATA_MOVE_VAL_FROM_ARG(node_to_insert->data, to_insert); \
+    DATA_MOVE_VAL_FROM_ARG(node_to_insert->data, to_insert); \
     RB_NODE_TYPENAME *parent = NULL; \
     RB_NODE_TYPENAME **insertion_point = &(tree->root); \
     while(*insertion_point) \
     { \
       parent = *insertion_point; \
-      if(COLN_DATA_COMPARE_VAL_VAL( \
+      if(DATA_COMPARE_VAL_VAL( \
           (*insertion_point)->data, \
           node_to_insert->data) > 0) \
         insertion_point = &LEFT_CHILD(*insertion_point); \
@@ -398,8 +400,8 @@
 
 #define RB_TREE_SEARCH_FNNAME COLN_CAT(RB_TREE_TYPENAME, _search)
 #define RB_TREE_SEARCH_SIGN \
-  COLN_DATA_TYPENAME *RB_TREE_SEARCH_FNNAME(RB_TREE_TYPENAME *tree, \
-                                            COLN_DATA_ARG(elem_to_search))
+  DATA_TYPENAME *RB_TREE_SEARCH_FNNAME(RB_TREE_TYPENAME *tree, \
+                                            DATA_ARG(elem_to_search))
 #define RB_TREE_SEARCH_CALL(tree_ptr, elem_to_search) \
   RB_TREE_SEARCH_FNNAME((tree_ptr), (elem_to_search))
 #define RB_TREE_SEARCH_DECL RB_TREE_SEARCH_SIGN;
@@ -407,11 +409,11 @@
   RB_TREE_SEARCH_SIGN \
   { \
     assert(tree); \
-    COLN_DATA_ASSERT_ARG(elem_to_search); \
+    DATA_ASSERT_ARG(elem_to_search); \
     RB_NODE_TYPENAME *cur = tree->root; \
     while(cur) \
     { \
-      int cmp_res = COLN_DATA_COMPARE_VAL_ARG(cur->data, elem_to_search); \
+      int cmp_res = DATA_COMPARE_VAL_ARG(cur->data, elem_to_search); \
       if(cmp_res < 0) cur = RIGHT_CHILD(cur); \
       else if(cmp_res == 0) return &(cur->data); \
       else cur = LEFT_CHILD(cur); \
@@ -422,8 +424,8 @@
 #define RB_TREE_REMOVE_FNNAME COLN_CAT(RB_TREE_TYPENAME, _remove)
 #define RB_TREE_REMOVE_SIGN \
   coln_result RB_TREE_REMOVE_FNNAME(RB_TREE_TYPENAME *tree, \
-                                    COLN_DATA_ARG(elem_to_remove), \
-                                    COLN_DATA_TYPENAME *removed_elem)
+                                    DATA_ARG(elem_to_remove), \
+                                    DATA_TYPENAME *removed_elem)
 #define RB_TREE_REMOVE_CALL(tree, elem_to_remove, removed_elem) \
   RB_TREE_REMOVE_FNNAME((tree), (elem_to_remove), (removed_elem))
 #define RB_TREE_REMOVE_DECL RB_TREE_REMOVE_SIGN;
@@ -431,12 +433,12 @@
   RB_TREE_REMOVE_SIGN \
   { \
     assert(tree); \
-    COLN_DATA_ASSERT_ARG(elem_to_remove); \
+    DATA_ASSERT_ARG(elem_to_remove); \
     int cur_pos; \
     RB_NODE_TYPENAME **removal_point = &(tree->root); \
     while(*removal_point) \
     { \
-      int cmp_res = COLN_DATA_COMPARE_VAL_ARG((*removal_point)->data, \
+      int cmp_res = DATA_COMPARE_VAL_ARG((*removal_point)->data, \
                                               elem_to_remove); \
       if(cmp_res < 0) \
       { \
@@ -455,7 +457,7 @@
     } \
     if(!(*removal_point)) return COLN_RESULT_ELEM_NOT_FOUND; \
     if(removed_elem) \
-      COLN_DATA_MOVE_PTR_FROM_VAL(removed_elem, (*removal_point)->data); \
+      DATA_MOVE_PTR_FROM_VAL(removed_elem, (*removal_point)->data); \
     if(LEFT_CHILD(*removal_point) && RIGHT_CHILD(*removal_point)) \
     { \
       RB_NODE_TYPENAME **succ_ptr = &RIGHT_CHILD(*removal_point); \
@@ -465,7 +467,7 @@
         succ_ptr = &LEFT_CHILD(*succ_ptr); \
         cur_pos = RB_NODE_DIR_LEFT; \
       } \
-      COLN_DATA_MOVE_VAL_FROM_VAL((*removal_point)->data, (*succ_ptr)->data); \
+      DATA_MOVE_VAL_FROM_VAL((*removal_point)->data, (*succ_ptr)->data); \
       removal_point = succ_ptr; \
     } \
     /*  We want the above case where we replace with successor to */ \
@@ -489,7 +491,7 @@
       if(COLOR(to_remove) == RB_NODE_COLOR_BLACK) \
         RB_TREE_HANDLE_BLACK_VIOLATION_CALL(tree, to_remove->parent, cur_pos); \
     } \
-    COLN_FREE(tree->allocator, to_remove); \
+    ALLOC_FREE(tree->allocator, to_remove); \
     return COLN_RESULT_SUCCESS; \
   }
 #define RB_TREE_HANDLE_BLACK_VIOLATION_FNNAME COLN_CAT( \
@@ -710,7 +712,7 @@
     RB_NODE_ROTATE_CALL(accessor, RB_NODE_DIR_RIGHT); \
   }
 
-#ifdef COLN_HEADER
+#ifdef RB_TREE_HEADER
   RB_NODE_STRUCT_DEFN
   RB_TREE_STRUCT_DEFN
   RB_TREE_INIT_DECL
@@ -721,7 +723,7 @@
   RB_TREE_REMOVE_DECL
 #endif
 
-#ifdef COLN_IMPL
+#ifdef RB_TREE_IMPL
   #define RB_NODE_COLOR_RED 0
   #define RB_NODE_COLOR_BLACK 1
   #define RB_NODE_DIR_LEFT 0
@@ -870,28 +872,28 @@
 #undef RB_TREE_TYPENAME
 #endif
 
-#ifdef COLN_FREE_SET
-#undef COLN_FREE_SET
-#undef COLN_FREE
+#ifdef ALLOC_FREE_SET
+#undef ALLOC_FREE_SET
+#undef ALLOC_FREE
 #endif
 
-#ifdef COLN_ALLOC_SET
-#undef COLN_ALLOC_SET
-#undef COLN_ALLOC
+#ifdef ALLOC_ALLOC_SET
+#undef ALLOC_ALLOC_SET
+#undef ALLOC_ALLOC
 #endif
 
-#undef COLN_ALLOC_ASSERT
-#undef COLN_ALLOC_ASSIGN
-#undef COLN_ALLOC_ARG
-#undef COLN_ALLOC_DECL
-#undef COLN_DATA_CLEAR_VAL
-#undef COLN_DATA_MOVE_PTR_FROM_VAL
-#undef COLN_DATA_MOVE_VAL_FROM_VAL
-#undef COLN_DATA_COMPARE_VAL_ARG
-#undef COLN_DATA_COMPARE_VAL_VAL
-#undef COLN_DATA_MOVE_VAL_FROM_ARG
-#undef COLN_DATA_ASSERT_ARG
-#undef COLN_DATA_ARG
+#undef ALLOC_ASSERT
+#undef ALLOC_ASSIGN
+#undef ALLOC_ARG
+#undef ALLOC_DECL
+#undef DATA_CLEAR_VAL
+#undef DATA_MOVE_PTR_FROM_VAL
+#undef DATA_MOVE_VAL_FROM_VAL
+#undef DATA_COMPARE_VAL_ARG
+#undef DATA_COMPARE_VAL_VAL
+#undef DATA_MOVE_VAL_FROM_ARG
+#undef DATA_ASSERT_ARG
+#undef DATA_ARG
 #undef COLN_INTERNAL_ASSERT
 #undef COLN_CAT 
 #undef COLN_CAT_

@@ -39,13 +39,11 @@
   #define DATA_RESULT_DECL(result) DATA_TYPENAME result
   #define DATA_RESULT_RETURN_STMT(result) return (result)
   #ifdef DATA_MOVE
-    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) \
-      (*(ptr) = DATA_MOVE((arg)))
+    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) DATA_MOVE((ptr), (arg))
     #define DATA_MOVE_RESULT_FROM_PTR(result, ptr) \
       ((result) = DATA_MOVE(*(ptr)))
   #else
-    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) \
-      (*(ptr) = (arg))
+    #define DATA_MOVE_PTR_FROM_ARG(ptr, arg) (*(ptr) = (arg))
     #define DATA_MOVE_RESULT_FROM_PTR(result, ptr) \
       ((result) = *(ptr))
   #endif
@@ -155,6 +153,11 @@
 #ifndef ARRAY_LIST_TYPENAME
   #define ARRAY_LIST_TYPENAME_SET
   #define ARRAY_LIST_TYPENAME COLN_CAT(DATA_TYPENAME, _array_list)
+#endif
+
+#ifndef ARRAY_LIST_NEW_CAP
+  #define ARRAY_LIST_NEW_CAP_SET
+  #define ARRAY_LIST_NEW_CAP(old_cap) ((old_cap) << 1)
 #endif
 
 #define ARRAY_LIST_STRUCT_DEFN \
@@ -445,7 +448,7 @@
   ARRAY_LIST_EXPAND_SIGN \
   { \
     COLN_INTERNAL_ASSERT(to_expand); \
-    size_t new_cap = to_expand->cap << 1; \
+    size_t new_cap = ARRAY_LIST_NEW_CAP(to_expand->cap); \
     ARRAY_LIST_EXPAND_REALLOC_AND_MOVE_SNIPPET \
     to_expand->data = new_buf; \
     to_expand->cap = new_cap; \
