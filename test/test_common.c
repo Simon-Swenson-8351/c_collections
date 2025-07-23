@@ -89,33 +89,29 @@ typedef struct dyn_str
   char *data;
 } dyn_str;
 
-bool dyn_str_copy(dyn_str *dest, dyn_str *src)
+bool dyn_str_copy(dyn_str *dest, dyn_str src)
 {
   assert(dest);
   assert(dest->data);
-  assert(src);
-  assert(src->data);
-  size_t buf_size = strlen(src->data) + 1;
+  assert(src.data);
+  size_t buf_size = strlen(src.data) + 1;
   dest->data = malloc(buf_size);
   if(!(dest->data)) return false;
-  memcpy(dest->data, src->data, buf_size);
+  memcpy(dest->data, src.data, buf_size);
   return true;
 }
 
-void dyn_str_clear(dyn_str *to_clear)
+void dyn_str_clear(dyn_str to_clear)
 {
-  assert(to_clear);
-  assert(to_clear->data);
-  free(to_clear->data);
+  assert(to_clear.data);
+  free(to_clear.data);
 }
 
-int dyn_str_cmp(dyn_str *a, dyn_str *b)
+int dyn_str_cmp(dyn_str a, dyn_str b)
 {
-  assert(a);
-  assert(a->data);
-  assert(b);
-  assert(b->data);
-  return strcmp(a->data, b->data);
+  assert(a.data);
+  assert(b.data);
+  return strcmp(a.data, b.data);
 }
 
 typedef struct linear_allocator

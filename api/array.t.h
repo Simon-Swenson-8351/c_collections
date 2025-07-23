@@ -24,24 +24,18 @@
   #error "Define only one of DATA_PASS_BY_VAL or DATA_PASS_BY_PTR"
 #endif
 
-#ifdef DATA_PASS_BY_VAL
+#if defined(DATA_PASS_BY_VAL)
   #define DATA_ARG(arg_name) DATA_TYPENAME arg_name
-  #define DATA_ASSERT_ARG(arg_name)
-  #define DATA_EQUALS_PTR_ARG(ptr, arg_val) \
-    DATA_EQUALS(*(ptr), (arg_val))
-  #define DATA_COMPARE_PTR_ARG(ptr, arg_val) \
-    DATA_COMPARE(*(ptr), (arg_val))
-  #define DATA_COMPARE_PTR_PTR(a, b) \
-    DATA_COMPARE(*(a), *(b))
-#else 
+  #define DATA_EQUALS_PTR_ARG(ptr, arg_val) DATA_EQUALS(*(ptr), (arg_val))
+  #define DATA_COMPARE_PTR_ARG(ptr, arg_val) DATA_COMPARE(*(ptr), (arg_val))
+  #define DATA_COMPARE_PTR_PTR(a, b) DATA_COMPARE(*(a), *(b))
+  #define DATA_DIGIT_PTR(ptr, digit) DATA_DIGIT(*(ptr), (digit))
+#elif defined(DATA_PASS_BY_PTR) 
   #define DATA_ARG(arg_name) DATA_TYPENAME *arg_name
-  #define DATA_ASSERT_ARG(arg_name) assert(arg_name)
-  #define DATA_EQUALS_PTR_ARG(ptr, arg_ptr) \
-    DATA_EQUALS((ptr), (arg_ptr))
-  #define DATA_COMPARE_PTR_ARG(ptr, arg_ptr) \
-    DATA_COMPARE((ptr), (arg_ptr))
-  #define DATA_COMPARE_PTR_PTR(a, b) \
-    DATA_COMPARE((a), (b))
+  #define DATA_EQUALS_PTR_ARG(ptr, arg_ptr) DATA_EQUALS((ptr), (arg_ptr))
+  #define DATA_COMPARE_PTR_ARG(ptr, arg_ptr) DATA_COMPARE((ptr), (arg_ptr))
+  #define DATA_COMPARE_PTR_PTR(a, b) DATA_COMPARE((a), (b))
+  #define DATA_DIGIT_PTR(ptr, digit) DATA_DIGIT((ptr), (digit))
 #endif
 
 #ifdef DATA_MOVE
@@ -76,13 +70,13 @@
 #endif
 
 #if !defined(DATA_EQUALS) && defined(DATA_COMPARE)
-#define DATA_EQUALS_SET
-#define DATA_EQUALS(a, b) (DATA_COMPARE((a), (b)) == 0)
+  #define DATA_EQUALS_SET
+  #define DATA_EQUALS(a, b) (DATA_COMPARE((a), (b)) == 0)
 #endif
 
 #ifndef ARRAY_TYPENAME 
-#define ARRAY_TYPENAME_SET
-#define ARRAY_TYPENAME COLN_CAT(DATA_TYPENAME, _array)
+  #define ARRAY_TYPENAME_SET
+  #define ARRAY_TYPENAME COLN_CAT(DATA_TYPENAME, _array)
 #endif
 
 #ifdef DATA_EQUALS
@@ -122,7 +116,7 @@
   #define ARRAY_ASSERT_SORTED_FNNAME COLN_CAT(ARRAY_TYPENAME, _assert_sorted)
   #define ARRAY_ASSERT_SORTED_SIGN \
     static void ARRAY_ASSERT_SORTED_FNNAME(DATA_TYPENAME *array, \
-                                                  size_t array_len)
+                                           size_t array_len)
 #endif
 
 #ifdef ARRAY_HEADER
@@ -157,7 +151,7 @@
     {
       assert(array_len > 0 ? array != NULL : true);
     #ifdef DATA_PASS_BY_PTR
-      DATA_ASSERT_ARG(to_find);
+      assert(to_find);
     #endif
       for(ptrdiff_t i = 0; i < (ptrdiff_t)array_len; i++)
         if(DATA_EQUALS_PTR_ARG(array + i, to_find)) return i;
@@ -170,7 +164,7 @@
     {
       assert(array_len > 0 ? array != NULL : true);
     #ifdef DATA_PASS_BY_PTR
-      DATA_ASSERT_ARG(to_find);
+      assert(to_find);
     #endif
       ARRAY_ASSERT_SORTED_FNNAME(array, array_len);
       ptrdiff_t left = 0;
@@ -225,11 +219,7 @@
       size_t high = len;
       while(low < high)
       {
-      #if defined(DATA_PASS_BY_VAL)
-        if(DATA_DIGIT(base[low], (unsigned int)digit))
-      #elif defined(DATA_PASS_BY_PTR)
-        if(DATA_DIGIT(base + low, (unsigned int)digit))
-      #endif
+        if(DATA_DIGIT_PTR(base + low, (unsigned int)digit))
         {
           if(low < high - 1) DATA_SWAP_PTR_PTR(base + low, base + high - 1);
           high--;
@@ -283,10 +273,10 @@
 #endif
 
 #undef DATA_SWAP_PTR_PTR
+#undef DATA_DIGIT_PTR
 #undef DATA_COMPARE_PTR_PTR
 #undef DATA_COMPARE_PTR_ARG
 #undef DATA_EQUALS_PTR_ARG
-#undef DATA_ASSERT_ARG
 #undef DATA_ARG
 
 #undef COLN_CAT

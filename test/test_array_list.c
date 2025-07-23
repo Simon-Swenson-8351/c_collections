@@ -37,11 +37,11 @@ void linear_allocator_free_dummy(linear_allocator *alloc, void *to_free)
 #undef ALLOC_FREE
 #undef ALLOC_ALLOC
 #undef ALLOC_TYPENAME
-#undef DATA_TRIVIAL_BY_PTR
+#undef DATA_PASS_BY_PTR
 #undef DATA_TYPENAME
 
 #define DATA_TYPENAME dyn_str
-#define DATA_PASS_BY_PTR
+#define DATA_PASS_BY_VAL
 #define DATA_COPY dyn_str_copy
 #define DATA_CLEAR dyn_str_clear
 #define ARRAY_LIST_TYPENAME dyn_str_array_list
@@ -55,7 +55,7 @@ void linear_allocator_free_dummy(linear_allocator *alloc, void *to_free)
 #undef ARRAY_LIST_TYPENAME
 #undef DATA_CLEAR
 #undef DATA_COPY
-#undef DATA_PASS_BY_PTR
+#undef DATA_PASS_BY_VAL
 #undef DATA_TYPENAME
 
 #define DATA_TYPENAME backrefd_struct
