@@ -114,6 +114,121 @@ int dyn_str_cmp(dyn_str a, dyn_str b)
   return strcmp(a.data, b.data);
 }
 
+typedef struct aug_int_call_counts
+{
+  int move_count;
+  int copy_count;
+  int clear_count;
+  int compare_count;
+  int equals_count;
+  int hash_count;
+  int digit_count;
+} aug_int_call_counts;
+
+typedef struct aug_int
+{
+  int i;
+  aug_int_call_counts *counter;
+} aug_int;
+
+aug_int aug_int_move_by_val(aug_int src)
+{
+  src.counter->move_count++;
+  return src;
+}
+
+void aug_int_move_by_ptr(aug_int *dest, aug_int *src)
+{
+  src->counter->move_count++;
+  *dest = *src;
+}
+
+bool aug_int_copy_by_val(aug_int *dest, aug_int src)
+{
+  assert(dest);
+  src.counter->copy_count++;
+  *dest = src;
+  return true;
+}
+
+bool aug_int_copy_by_ptr(aug_int *dest, aug_int *src)
+{
+  assert(dest);
+  assert(src);
+  src->counter->copy_count++;
+  *dest = *src;
+  return true;
+}
+
+void aug_int_clear_by_val(aug_int to_clear)
+{
+  to_clear.counter->clear_count++;
+}
+
+void aug_int_clear_by_ptr(aug_int *to_clear)
+{
+  assert(to_clear);
+  to_clear->counter->clear_count++;
+}
+
+int aug_int_compare_by_val(aug_int a, aug_int b)
+{
+  a.counter->compare_count++;
+  b.counter->compare_count++;
+  return (a.i > b.i) ? 1 : ((a.i == b.i) ? 0 : -1);
+}
+
+int aug_int_compare_by_ptr(aug_int *a, aug_int *b)
+{
+  assert(a);
+  assert(b);
+  a->counter->compare_count++;
+  b->counter->compare_count++;
+  return (a->i > b->i) ? 1 : ((a->i == b->i) ? 0 : -1);
+}
+
+bool aug_int_equals_by_val(aug_int a, aug_int b)
+{
+  a.counter->equals_count++;
+  b.counter->equals_count++;
+  return a.i == b.i;
+}
+
+bool aug_int_equals_by_ptr(aug_int *a, aug_int *b)
+{
+  assert(a);
+  assert(b);
+  a->counter->equals_count++;
+  b->counter->equals_count++;
+  return a->i == b->i;
+}
+
+size_t aug_int_hash_by_val(aug_int to_hash)
+{
+  to_hash.counter->hash_count++;
+  return (size_t)(to_hash.i);
+}
+
+size_t aug_int_hash_by_ptr(aug_int *to_hash)
+{
+  assert(to_hash);
+  to_hash->counter->hash_count++;
+  return (size_t)(to_hash->i);
+}
+
+bool aug_int_digit_by_val(aug_int a, unsigned int digit)
+{
+  a.counter->digit_count++;
+  return (a.i >> digit) & 1;
+}
+
+bool aug_int_digit_by_ptr(aug_int *a, unsigned int digit)
+{
+  assert(a);
+  a->counter->digit_count++;
+  return (a->i >> digit) & 1;
+}
+
 typedef struct linear_allocator
 {
   uint8_t *buf;
@@ -234,6 +349,7 @@ void *dynamic_slot_allocator_alloc(dynamic_slot_allocator *alloc, size_t size)
   return result;
 }
 
+#include <stdio.h>
 void dynamic_slot_allocator_free(dynamic_slot_allocator *alloc, void *to_free)
 {
   assert(alloc);
@@ -241,6 +357,34 @@ void dynamic_slot_allocator_free(dynamic_slot_allocator *alloc, void *to_free)
   ((slot_header *)to_free)->next_free = alloc->first_free;
   alloc->first_free = (slot_header *)to_free;
   alloc->used--;
+}
+
+typedef struct stdalloc_wrapper
+{
+  int alloc_call_count;
+  int realloc_call_count;
+  int free_call_count;
+} stdalloc_wrapper;
+
+void *stdalloc_wrapper_alloc(stdalloc_wrapper *alloc, size_t size)
+{
+  assert(alloc);
+  alloc->alloc_call_count++;
+  return malloc(size);
+}
+
+void stdalloc_wrapper_free(stdalloc_wrapper *alloc, void *to_free)
+{
+  assert(alloc);
+  alloc->free_call_count++;
+  free(to_free);
+}
+
+void *stdalloc_wrapper_realloc(stdalloc_wrapper *alloc, void *old, size_t new_size)
+{
+  assert(alloc);
+  alloc->realloc_call_count++;
+  return realloc(old, new_size);
 }
 
 #undef UNIVERSALIZE_SIZE

@@ -39,7 +39,7 @@
 #undef DATA_TYPENAME
 
 #define DATA_TYPENAME dyn_str
-#define DATA_PASS_BY_PTR
+#define DATA_PASS_BY_VAL
 #define DATA_COPY dyn_str_copy
 #define DATA_CLEAR dyn_str_clear
 #define DATA_COMPARE dyn_str_cmp
@@ -629,9 +629,9 @@ int test_with_allocator(void)
   int_slot_allocd_red_black_tree_insert(&tree, 7);
   if(alloc.used != 5) return 1;
   int_slot_allocd_red_black_tree tree2;
-  int_slot_allocd_red_black_tree_copy(&tree2, &tree);
+  assert(!int_slot_allocd_red_black_tree_copy(&tree2, &tree));
   if(alloc.used != 10) return 1;
-  int_slot_allocd_red_black_tree_remove(&tree2, 5, NULL);
+  assert(!int_slot_allocd_red_black_tree_remove(&tree2, 5, NULL));
   if(alloc.used != 9) return 1;
   int_slot_allocd_red_black_tree_clear(&tree);
   if(alloc.used != 4) return 1;
